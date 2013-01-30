@@ -77,15 +77,19 @@ public class LogServiceAnalyzer implements Runnable{
 	public LogServiceAnalyzer() throws RemoteException{
 		loadParametersFromRegistry();
 		
-		GlobalConfiguration gc = GlobalConfiguration.getClusteredDefault();
 		
-		gc.setClusterName("LogServiceConnection");
-		Configuration c = new Configuration();
-		c.setCacheMode(Configuration.CacheMode.REPL_SYNC);
-		c.setExpirationLifespan(-1);
-		c.setExpirationMaxIdle(-1);
-		EmbeddedCacheManager cm = new DefaultCacheManager(gc, c);
-		this.cache = cm.getCache();
+		if(enableInfinispan){
+			GlobalConfiguration gc = GlobalConfiguration.getClusteredDefault();
+
+			gc.setClusterName("LogServiceConnection");
+			Configuration c = new Configuration();
+			c.setCacheMode(Configuration.CacheMode.REPL_SYNC);
+			c.setExpirationLifespan(-1);
+			c.setExpirationMaxIdle(-1);
+			EmbeddedCacheManager cm = new DefaultCacheManager(gc, c);
+			this.cache = cm.getCache();
+
+		}
 		//System.out.println("Running Log Service Analyzer Thread!!");
 		
 		//TransactionManager tm = cache.getAdvancedCache().getTransactionManager();+
@@ -118,7 +122,7 @@ public class LogServiceAnalyzer implements Runnable{
 				e.printStackTrace();
 			}
 			try {
-				System.out.println("Dataitem in cache: "+cache.size());
+				//System.out.println("Dataitem in cache: "+cache.size());
 				//System.out.println("Running Log Service Analyzer Thread!!");
 				File active_folder = new File("log/ls_processed");
 				if(active_folder.isDirectory()){
