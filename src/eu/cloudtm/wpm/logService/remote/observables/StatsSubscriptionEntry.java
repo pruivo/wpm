@@ -230,6 +230,9 @@ public class StatsSubscriptionEntry {
 					else if("FLOAT".equals(current.getJava_type())){
 						result.add(new PublishAttribute<Float>(rt, current.getResource_index(), current.getShort_name(), Float.parseFloat(current.getValue())));
 					}
+					else if("LONG".equals(current.getJava_type())){
+						result.add(new PublishAttribute<Long>(rt, current.getResource_index(), current.getShort_name(), Long.parseLong(current.getValue())));
+					}
 					
 				}
 			}

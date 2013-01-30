@@ -47,6 +47,8 @@ public class WPMParser{
 					case DISK : att.setShort_name("fileSystemUsage."+att.getShort_name());break;
 					//case NETWORK : att.setShort_name("CpuPerc."+att.getShort_name());break;
 				}
+				
+					
 				att.setJava_type(attribute.nextToken());//java type field
 				att.setValue(attribute.nextToken());// value field
 				attributesList.add(att);
