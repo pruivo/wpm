@@ -9,6 +9,8 @@ public final class Handle implements Externalizable{
 	
 	private long id;
 	
+	public Handle(){}
+	
 	public Handle(long id){
 		
 		this.id = id;
