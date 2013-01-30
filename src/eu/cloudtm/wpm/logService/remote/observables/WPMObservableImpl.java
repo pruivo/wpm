@@ -4,12 +4,15 @@ import java.rmi.RemoteException;
 import java.rmi.server.UnicastRemoteObject;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 import eu.cloudtm.wpm.logService.remote.events.SubscribeEvent;
 import eu.cloudtm.wpm.logService.remote.listeners.WPMStatisticsRemoteListener;
 import eu.cloudtm.wpm.logService.remote.listeners.WPMViewChangeRemoteListener;
 
 public class WPMObservableImpl extends UnicastRemoteObject implements WPMObservable{
+	
+	private AtomicLong generator = new AtomicLong(0L);
 	
 	
 	private ConcurrentLinkedQueue<StatsSubscriptionEntry> statsSubscriptions;
@@ -43,19 +46,25 @@ public class WPMObservableImpl extends UnicastRemoteObject implements WPMObserva
 	}
 
 	@Override
-	public void registerWPMStatisticsRemoteListener(SubscribeEvent event, WPMStatisticsRemoteListener listener) throws RemoteException {
+	public Handle registerWPMStatisticsRemoteListener(SubscribeEvent event, WPMStatisticsRemoteListener listener) throws RemoteException {
 	
-		System.out.println("Registered Statistics Listener");	
-		this.statsSubscriptions.add(new StatsSubscriptionEntry(event.getVMs(),listener));
+		System.out.println("Registered Statistics Listener");
+		Handle handle = new Handle(this.generator.incrementAndGet());
+		this.statsSubscriptions.add(new StatsSubscriptionEntry(handle, event.getVMs(),listener));
+		
+		return handle;
 		
 	}
 
 	@Override
-	public void registerWPMViewChangeRemoteListener(
+	public Handle registerWPMViewChangeRemoteListener(
 			WPMViewChangeRemoteListener listener) throws RemoteException {
 		
 		System.out.println("Registered View Change Listener");
-		this.viewSubscriptions.add(new ViewSubscriptionEntry(listener));
+		Handle handle = new Handle(this.generator.incrementAndGet());
+		this.viewSubscriptions.add(new ViewSubscriptionEntry(handle, listener));
+		
+		return handle;
 	}
 
 	public void garbageCollect(WPMViewChangeRemoteListener wpmViewChangeRemoteListener) {
@@ -78,6 +87,38 @@ public class WPMObservableImpl extends UnicastRemoteObject implements WPMObserva
 				this.statsSubscriptions.remove(entry);
 				break;
 			}
+		}
+		
+	}
+
+	@Override
+	public void removeWPMStatisticsRemoteListener(Handle handle)
+			throws RemoteException {
+		
+		for(StatsSubscriptionEntry entry: this.statsSubscriptions){
+			
+			if(entry.getHandle() != null && entry.getHandle().equals(handle)){
+				
+				this.statsSubscriptions.remove(entry);
+				
+			}
+			
+		}
+		
+	}
+
+	@Override
+	public void removeWPMViewChangeRemoteListener(Handle handle)
+			throws RemoteException {
+		
+		for(ViewSubscriptionEntry entry: this.viewSubscriptions){
+			
+			if(entry.getHandle() != null && entry.getHandle().equals(handle)){
+				
+				this.viewSubscriptions.remove(entry);
+				
+			}
+			
 		}
 		
 	}

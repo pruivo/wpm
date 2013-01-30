@@ -15,6 +15,8 @@ import eu.cloudtm.wpm.parser.ResourceType;
 
 public class StatsSubscriptionEntry {
 	
+	private Handle handle;
+	
 	private String[] ips;
 	
 	private Measurement[] measurements;
@@ -25,7 +27,9 @@ public class StatsSubscriptionEntry {
 	
 	private WPMStatisticsRemoteListener remoteListener;
 	
-	public StatsSubscriptionEntry(String[] ips, WPMStatisticsRemoteListener remoteListener){
+	public StatsSubscriptionEntry(Handle handle, String[] ips, WPMStatisticsRemoteListener remoteListener){
+		
+		this.handle = handle;
 		
 		this.ips = ips;
 		
@@ -47,6 +51,15 @@ public class StatsSubscriptionEntry {
 	}
 	
 	
+	
+	
+	public Handle getHandle() {
+		return handle;
+	}
+
+
+
+
 	public WPMStatisticsRemoteListener getListener() {
 		return remoteListener;
 	}

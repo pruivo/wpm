@@ -10,8 +10,12 @@ import eu.cloudtm.wpm.logService.remote.listeners.WPMViewChangeRemoteListener;
 public interface WPMObservable extends Remote {
 	
 	
-	public void registerWPMStatisticsRemoteListener(SubscribeEvent event, WPMStatisticsRemoteListener listener) throws RemoteException;
+	public Handle registerWPMStatisticsRemoteListener(SubscribeEvent event, WPMStatisticsRemoteListener listener) throws RemoteException;
 	
-	public void registerWPMViewChangeRemoteListener(WPMViewChangeRemoteListener listener) throws RemoteException;
+	public Handle registerWPMViewChangeRemoteListener(WPMViewChangeRemoteListener listener) throws RemoteException;
+	
+	public void removeWPMStatisticsRemoteListener(Handle handle) throws RemoteException;
+	
+	public void removeWPMViewChangeRemoteListener(Handle handle) throws RemoteException;
 
 }

@@ -15,6 +15,6 @@
 	<classpathentry exported="true" kind="lib" path="lib/org.osgi.core-4.3.0.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/snmp4j-1.9.1f.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/jboss-client.jar"/>
-	<classpathentry kind="lib" path="/Users/sebastiano/Documents/University/PhD/Current_work/12_Deliverable_2013_01/wpm-src/lib/infinispan-core.jar"/>
+	<classpathentry kind="lib" path="lib/infinispan-core.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

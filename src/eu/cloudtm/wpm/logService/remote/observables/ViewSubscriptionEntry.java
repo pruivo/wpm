@@ -6,8 +6,10 @@ public class ViewSubscriptionEntry {
 	
 	private WPMViewChangeRemoteListener listener;
 	
-	public ViewSubscriptionEntry(WPMViewChangeRemoteListener listener){
-		
+	private Handle handle;
+	
+	public ViewSubscriptionEntry(Handle handle, WPMViewChangeRemoteListener listener){
+		this.handle = handle;
 		this.listener = listener;
 		
 	}
@@ -15,6 +17,12 @@ public class ViewSubscriptionEntry {
 	public WPMViewChangeRemoteListener getListener() {
 		return listener;
 	}
+
+	public Handle getHandle() {
+		return handle;
+	}
+	
+	
 	
 	
 	
