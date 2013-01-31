@@ -4,7 +4,7 @@
               To include a user specific buildfile here, simply create one in the same
               directory with the processing instruction <?eclipse.ant.import?>
               as the first entry and export the buildfile again. -->
-<project basedir="." default="build" name="Workwload_Monitor">
+<project basedir="." default="jar" name="Workwload_Monitor">
     <property environment="env"/>
     <property name="ECLIPSE_HOME" value="../../../Software/eclipse"/>
     <property name="LatticeCloudTM.location" value="../LatticeCloudTM"/>
@@ -60,6 +60,7 @@
     </target>
     <target name="clean">
         <delete dir="bin"/>
+	<delete file="wpm.jar"/>
     </target>
     <target depends="clean" name="cleanall">
         <ant antfile="${LatticeCloudTM.location}/build.xml" dir="${LatticeCloudTM.location}" inheritAll="false" target="clean"/>
