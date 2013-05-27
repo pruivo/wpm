@@ -29,14 +29,17 @@ import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
@@ -44,6 +47,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.PriorityQueue;
 import java.util.Properties;
@@ -62,19 +66,16 @@ import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 
+import eu.cloudtm.wpm.logService.remote.observables.*;
 
-import eu.cloudtm.wpm.logService.remote.publisher.PublishStatsEventInternal;
-import eu.cloudtm.wpm.logService.remote.publisher.PublisherStatsThread;
-import eu.cloudtm.wpm.logService.remote.publisher.PublisherViewThread;
-import eu.cloudtm.wpm.logService.remote.events.PublishViewChangeEvent;
-import eu.cloudtm.wpm.logService.remote.observables.StatsSubscriptionEntry;
-import eu.cloudtm.wpm.logService.remote.observables.ViewSubscriptionEntry;
-import eu.cloudtm.wpm.logService.remote.observables.WPMObservable;
-import eu.cloudtm.wpm.logService.remote.observables.WPMObservableImpl;
-import eu.cloudtm.wpm.parser.Measurement;
-import eu.cloudtm.wpm.parser.MeasurementAttribute;
-import eu.cloudtm.wpm.parser.ResourceType;
-import eu.cloudtm.wpm.parser.WPMParser;
+import eu.cloudtm.wpm.logService.remote.events.*;
+
+import eu.cloudtm.wpm.logService.remote.listeners.*;
+
+import eu.cloudtm.wpm.logService.remote.publisher.*;
+
+import eu.cloudtm.wpm.parser.*;
+
 
 /*
 * @author Roberto Palmieri
@@ -100,6 +101,8 @@ public class LogServiceAnalyzer implements Runnable{
 	private long numJmxNodes = 0;
 	
 	private long numCheckJmxNodes = 0;
+	
+	private StatsSubscriptionEntry csvFileStaticLocalSubscription;
 	
 	public LogServiceAnalyzer() throws RemoteException{
 		loadParametersFromRegistry();
@@ -224,6 +227,8 @@ public class LogServiceAnalyzer implements Runnable{
 					            				
 					            			}
 					            			
+					            			this.csvFileStaticLocalSubscription = new StatsSubscriptionEntry(null, addresses, null);//No handle and no remote listener here
+					            			
 					            			
 					            			PublishViewChangeEvent event = new PublishViewChangeEvent(addresses);
 					            			
@@ -244,17 +249,12 @@ public class LogServiceAnalyzer implements Runnable{
 					            		}
 				            			
 				            			
-				            			
-				            			
-				            			
-				            			
-				            			
-				            			
-				            			
+				            		
 				            			
 				            			String ip = mis.getIp();
 				            			int resourceType = mis.getResourceType().ordinal();
 				            			
+				            			//Add measure to each dynamic subscription
 				            			Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
 				            			
 				            			while(itr.hasNext()){
@@ -262,6 +262,11 @@ public class LogServiceAnalyzer implements Runnable{
 				            				
 				            				itr.next().addMeasurement(mis);
 				            				
+				            			}
+				            			
+				            			//Add measure to the static subscription
+				            			if(this.csvFileStaticLocalSubscription != null){
+				            				this.csvFileStaticLocalSubscription.addMeasurement(mis);
 				            			}
 				            			
 				            		}
@@ -333,13 +338,30 @@ public class LogServiceAnalyzer implements Runnable{
 				            	if(enableListeners){
 				            		
 				            		
-				            		
-				            		
-				            		
-				            		
-				            		
-				            		
 				            		//Try to publish here
+				            		
+				            		//First try to publish for the static subscription (it produces the cvs files!!!)
+				            		
+				            		PublishStatsEventInternal staticToPublish = null;
+				            		
+				            		if(this.csvFileStaticLocalSubscription != null){
+				            			
+				            			staticToPublish = this.csvFileStaticLocalSubscription.computePublishStatsEventInternal();
+				            		}
+				            		
+				            		
+				            			
+				            		//produce CSV here
+				            		produceCSV(staticToPublish, System.currentTimeMillis());
+				            			
+				            			
+				            		
+				            		
+				            		
+				            		
+				            		
+				            		//Then try to publish for the dynamic subscriptions
+				            		
 				            		Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
 				            		
 				            		int i = 0;
@@ -391,6 +413,789 @@ public class LogServiceAnalyzer implements Runnable{
 		}
 	}
 	
+	private void produceCSV(PublishStatsEventInternal pei, long timestamp){
+
+		if(pei != null){
+			PublishStatisticsEvent pse = pei.getPerSubscriptionEvent();
+
+			List<PublishAttribute[]> cpuStats = new LinkedList<PublishAttribute[]>();
+			List<PublishAttribute[]> memoryStats = new LinkedList<PublishAttribute[]>();
+			List<PublishAttribute[]> networkStats = new LinkedList<PublishAttribute[]>();
+			List<PublishAttribute[]> diskStats = new LinkedList<PublishAttribute[]>();
+			List<PublishAttribute[]> jmxStats = new LinkedList<PublishAttribute[]>();
+
+
+			if(pse != null){
+				Set<String> IPs = pse.getIps();
+				ResourceType currentResourceType;
+
+				int numResources;
+				PublishAttribute[][] allAttr;
+				for(String currentIP: IPs){
+					//This is one for each machine!
+
+
+					//CPU
+					currentResourceType = ResourceType.CPU;
+					//numResources = pse.getNumResources(currentResourceType, currentIP);
+
+					//for(int i = 0; i<numResources; i++){
+						
+						//cpuStats.add(produceCSVFor(pse, currentIP, currentResourceType, i));
+
+					//}
+					
+					allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
+					if(allAttr != null){
+						for(int i = 0; i<allAttr.length; i++){
+							
+							cpuStats.add(allAttr[i]);
+
+						}
+					}
+
+
+					//Memory
+					currentResourceType = ResourceType.MEMORY;
+					
+					//numResources = pse.getNumResources(currentResourceType, currentIP);
+					//for(int i = 0; i<numResources; i++){
+
+					//	memoryStats.add(produceCSVFor(pse, currentIP, currentResourceType, i));
+
+					//}
+					
+					allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
+					if(allAttr != null){
+						for(int i = 0; i<allAttr.length; i++){
+							
+							memoryStats.add(allAttr[i]);
+
+						}
+					}
+
+
+					//Disk
+					currentResourceType = ResourceType.DISK;
+					
+					//numResources = pse.getNumResources(currentResourceType, currentIP);
+					//for(int i = 0; i<numResources; i++){
+
+					//	diskStats.add(produceCSVFor(pse, currentIP, currentResourceType, i));
+
+					//}
+					allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
+					if(allAttr != null){
+						for(int i = 0; i<allAttr.length; i++){
+							
+							diskStats.add(allAttr[i]);
+
+						}
+					}
+
+					//Network
+					currentResourceType = ResourceType.NETWORK;
+					//numResources = pse.getNumResources(currentResourceType, currentIP);
+					//for(int i = 0; i<numResources; i++){
+
+					//	networkStats.add(produceCSVFor(pse, currentIP, currentResourceType, i));
+
+					//}
+					allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
+					if(allAttr != null){
+						for(int i = 0; i<allAttr.length; i++){
+							
+							networkStats.add(allAttr[i]);
+
+						}
+					}
+					
+
+					//JMX
+					currentResourceType = ResourceType.JMX;
+					
+					//numResources = pse.getNumResources(currentResourceType, currentIP);
+					//for(int i = 0; i<numResources; i++){
+
+					//	jmxStats.add(produceCSVFor(pse, currentIP, currentResourceType, i));
+
+					//}
+					
+					allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
+					if(allAttr != null){
+						for(int i = 0; i<allAttr.length; i++){
+							
+							jmxStats.add(allAttr[i]);
+
+						}
+					}
+
+					
+					PublishAttribute[] aggregatedCPU = produceAggregationFor(cpuStats);
+					PublishAttribute[] aggregatedMemory = produceAggregationFor(memoryStats);
+					PublishAttribute[] aggregatedDisk = produceAggregationFor(diskStats);
+					PublishAttribute[] aggregatedNetwork = produceAggregationFor(networkStats);
+					PublishAttribute[] aggregatedJmx = produceAggregationFor(jmxStats);
+					
+					produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork, aggregatedJmx, timestamp);
+					
+					//produceAggregatedCSVFor(ResourceType.CPU, cpuStats);
+					//produceAggregatedCSVFor(ResourceType.MEMORY, memoryStats);
+					//produceAggregatedCSVFor(ResourceType.DISK, diskStats);
+					//produceAggregatedCSVFor(ResourceType.NETWORK, networkStats);
+					//produceAggregatedCSVFor(ResourceType.JMX, jmxStats);
+
+
+				}
+
+			}
+
+		}
+	}
+	
+	
+	private void produceAggregatedCSVFor(PublishAttribute[] aggregatedCPU, PublishAttribute[] aggregatedMemory, PublishAttribute[] aggregatedDisk, PublishAttribute[] aggregatedNetwork, PublishAttribute[] aggregatedJmx, long timestamp){
+		
+			PublishAttribute[] current;
+			
+			FileOutputStream fos = null;
+			PrintStream out = null;
+			try {
+				boolean exists = false;
+				File fileFolder = new File("log/csv/cluster");
+				
+				exists = fileFolder.exists();
+				if(!exists){
+					fileFolder.mkdirs();
+				}
+				
+				File file = new File(fileFolder,"cluster.csv");
+				
+				exists = file.exists();
+				
+				fos = new FileOutputStream(file, true);
+				out = new PrintStream(fos);
+				String line;
+				String header;
+				if(out != null){
+					line=""+timestamp+",";
+					header="Timestamp,";
+					
+					current = aggregatedCPU;
+					if(current != null){
+						for(int i = 0; i<current.length; i++){
+
+							if(current[i] != null){
+								header+=""+current[i].getName();
+								line+=""+current[i].getValue();
+
+								header+=",";
+								line+=",";
+
+								
+							}	
+
+						}
+
+					}
+					
+					current = aggregatedMemory;
+					if(current != null){
+						for(int i = 0; i<current.length; i++){
+
+							if(current[i] != null){
+								header+=""+current[i].getName();
+								line+=""+current[i].getValue();
+
+								header+=",";
+								line+=",";
+
+								
+							}	
+
+						}
+
+					}
+					
+					current = aggregatedDisk;
+					if(current != null){
+						for(int i = 0; i<current.length; i++){
+
+							if(current[i] != null){
+								header+=""+current[i].getName();
+								line+=""+current[i].getValue();
+
+								header+=",";
+								line+=",";
+
+								
+							}	
+
+						}
+
+					}
+					
+					current = aggregatedNetwork;
+					if(current != null){
+						for(int i = 0; i<current.length; i++){
+
+							if(current[i] != null){
+								header+=""+current[i].getName();
+								line+=""+current[i].getValue();
+
+								header+=",";
+								line+=",";
+
+								
+							}	
+
+						}
+
+					}
+					
+					current = aggregatedJmx;
+					if(current != null){
+						for(int i = 0; i<current.length; i++){
+
+							if(current[i] != null){
+								header+=""+current[i].getName();
+								line+=""+current[i].getValue();
+								if(i!=current.length-1){
+									header+=",";
+									line+=",";
+								}	
+
+								
+							}	
+
+						}
+
+					}
+					
+					
+					
+					if(!exists){
+						out.println(header);
+					}
+					out.println(line);
+					out.flush();
+					
+					
+				}
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
+			finally{
+				if(out != null){
+					out.close();
+				}
+				
+				if(fos != null){
+					try {
+						fos.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+			
+		}
+		
+	
+	private PublishAttribute[] produceAggregationFor(List<PublishAttribute[]> list){
+		
+        PublishAttribute[] result = null;
+		
+		int numSeenSamples = 0;
+		
+		if(list!=null){
+			
+			for(PublishAttribute[] current: list){
+				
+				if(result == null){
+					
+					result = new PublishAttribute[current.length];
+					
+					for(int i = 0; i < current.length; i++){
+						
+						if(getAggregationType(current[i]) == Aggregation.NO){
+							
+							result[i] = null;
+							
+						}
+						else{
+							result[i] = new PublishAttribute(current[i].getResourceType(), current[i].getResourceIndex(), current[i].getAttributeIndex(), current[i].getName(), current[i].getValue());
+						}
+						
+					}
+					
+				}
+				else{
+					
+					for(int i = 0; i < current.length; i++){
+						
+						aggregate(result[i], current[i], getAggregationType(current[i]), numSeenSamples);
+						
+					}
+					
+					
+					
+				}
+				
+				numSeenSamples++;
+				
+			}
+		}	
+		return result;	
+	}
+	/*
+	private void produceAggregatedCSVFor(ResourceType res, List<PublishAttribute[]> list){
+		
+		PublishAttribute[] result = null;
+		
+		int numSeenSamples = 0;
+		
+		if(list!=null){
+			
+			for(PublishAttribute[] current: list){
+				
+				if(result == null){
+					
+					result = new PublishAttribute[current.length];
+					
+					for(int i = 0; i < current.length; i++){
+						
+						if(getAggregationType(current[i]) == Aggregation.NO){
+							
+							result[i] = null;
+							
+						}
+						else{
+							result[i] = new PublishAttribute(current[i].getResourceType(), current[i].getResourceIndex(), current[i].getAttributeIndex(), current[i].getName(), current[i].getValue());
+						}
+						
+					}
+					
+				}
+				else{
+					
+					for(int i = 0; i < current.length; i++){
+						
+						aggregate(result[i], current[i], getAggregationType(current[i]), numSeenSamples);
+						
+					}
+					
+					
+					
+				}
+				
+				numSeenSamples++;
+				
+			}
+			
+			
+			if(result != null){
+				
+				
+				FileOutputStream fos = null;
+				PrintStream out = null;
+				try {
+					boolean exists = false;
+					File fileFolder = new File("log/csv/cluster");
+					
+					exists = fileFolder.exists();
+					if(!exists){
+						fileFolder.mkdirs();
+					}
+					
+					File file = new File(fileFolder,""+res.toString()+".csv");
+					
+					exists = file.exists();
+					
+					fos = new FileOutputStream(file, true);
+					out = new PrintStream(fos);
+					String line;
+					String header;
+					if(out != null){
+						line="";
+						header="";
+						for(int i = 0; i<result.length; i++){
+							
+							if(result[i] != null){
+								header+=""+result[i].getName();
+								line+=""+result[i].getValue();
+								
+								if(i!=result.length-1 && result[i+1] != null){
+									header+=",";
+									line+=",";
+									
+								}
+							}	
+							
+						}
+						if(!exists){
+							out.println(header);
+						}
+						out.println(line);
+						out.flush();
+						
+						
+					}
+				} catch (FileNotFoundException e) {
+					e.printStackTrace();
+				}
+				finally{
+					if(out != null){
+						out.close();
+					}
+					
+					if(fos != null){
+						try {
+							fos.close();
+						} catch (IOException e) {
+							e.printStackTrace();
+						}
+					}
+				}
+				
+			}
+			
+			
+			
+		}
+		
+		
+	}
+	*/
+	private void aggregate(PublishAttribute result, PublishAttribute newSample, Aggregation aggrType, int numSeenSamples){
+		
+		if(result == null || newSample == null){
+			return;
+		}
+		
+		Object partialValue = result.getValue();
+		Object newSampleValue = newSample.getValue();
+		
+		if(partialValue == null || newSampleValue == null){
+			
+			return;
+		}
+		
+		//Now I convert all these numeric values to Double!
+		
+		Double partialDoubleValue = 0.0D;
+		Double newSampleDoubleValue = 0.0D;
+		
+		if(partialValue instanceof Integer){
+			partialDoubleValue = ((Integer) partialValue) * 1.0D;
+		}
+		else if(partialValue instanceof Long){
+			partialDoubleValue = ((Long) partialValue) * 1.0D;
+		}
+		else if (partialValue instanceof Float){
+			partialDoubleValue = ((Float) partialValue) * 1.0D;
+		}
+		else if(partialValue instanceof Double){
+			partialDoubleValue = (Double) partialValue;
+		}
+		else{
+			return;
+		}
+		
+		if(newSampleValue instanceof Integer){
+			newSampleDoubleValue = ((Integer) newSampleValue) * 1.0D;
+		}
+		else if(newSampleValue instanceof Long){
+			newSampleDoubleValue = ((Long) newSampleValue) * 1.0D;
+		}
+		else if (newSampleValue instanceof Float){
+			newSampleDoubleValue = ((Float) newSampleValue) * 1.0D;
+		}
+		else if(newSampleValue instanceof Double){
+			newSampleDoubleValue = (Double) newSampleValue;
+		}
+		else{
+			return;
+		}
+		
+		if(aggrType == Aggregation.SUM){
+			
+			
+			result.setValue(partialDoubleValue + newSampleDoubleValue);
+			
+			
+			
+		}
+		else if (aggrType == Aggregation.MEAN){
+			if(numSeenSamples > 0){
+				
+				result.setValue((partialDoubleValue / (numSeenSamples*1.0D) + newSampleDoubleValue) / ((numSeenSamples+1)*1.0D));
+				
+			}
+		}
+		
+	}
+	/*
+	private PublishAttribute[] produceCSVFor(PublishStatisticsEvent pse, String IP, ResourceType resType, int resIndex){
+		
+		PublishMeasurement pm = pse.getPublishMeasurement(resType, resIndex, IP);
+	
+		FileOutputStream fos = null;
+		PrintStream out = null;
+		try {
+			boolean exists = false;
+			File fileFolder = new File("log/csv/"+IP);
+			
+			exists = fileFolder.exists();
+			if(!exists){
+				fileFolder.mkdirs();
+			}
+			
+			File file = new File(fileFolder,""+IP+"_"+resType.toString()+"_"+resIndex+".csv");
+			
+			exists = file.exists();
+			
+			fos = new FileOutputStream(file, true);
+			out = new PrintStream(fos);
+			PublishAttribute[] attr = toArray(pm.getValues(), resIndex);
+			String line;
+			String header;
+			if(out != null && attr!=null){
+				line="";
+				header="";
+				for(int i = 0; i<attr.length; i++){
+					
+					if(attr[i] != null){
+						header+=""+attr[i].getName();
+						line+=""+attr[i].getValue();
+						
+						if(i!=attr.length-1){
+							header+=",";
+							line+=",";
+							
+						}
+					}	
+					
+				}
+				if(!exists){
+					out.println(header);
+				}
+				out.println(line);
+				out.flush();
+				
+				return attr;
+			}
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		}
+		finally{
+			if(out != null){
+				out.close();
+			}
+			
+			if(fos != null){
+				try {
+					fos.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+		
+		return null;
+		
+	}
+	*/
+    private PublishAttribute[][] produceCSVFor(PublishStatisticsEvent pse, String IP, ResourceType resType, long timestamp){
+		
+    	int numResources = pse.getNumResources(resType, IP);
+    	int numAttributes = 0;
+    	if(numResources > 0){
+
+    		PublishAttribute[][] allAttr = new PublishAttribute[numResources][];
+    		PublishAttribute[] current;
+    		PublishMeasurement pm;
+    		for(int i = 0; i < numResources; i++){
+    			pm = pse.getPublishMeasurement(resType, i, IP); 
+    			current = toArray(pm.getValues(), i);
+    			allAttr[i] = current;
+    			if(current != null){
+    				numAttributes = current.length;
+    			}
+    		}
+
+
+    		FileOutputStream fosNumeric = null;
+    		PrintStream outNumeric = null;
+    		FileOutputStream fosOthers = null;
+    		PrintStream outOthers = null;
+    		
+    		FileOutputStream fosTopKeys = null;
+    		PrintStream outTopKeys = null;
+    		try {
+    			boolean existsNumeric = false;
+    			boolean existsOthers = false;
+    			boolean existsTopKeys = false;
+    			
+    			boolean atLeastOneNumeric = false;
+    			boolean atLeastOneOthers = false;
+    			boolean atLeastOneTopKeys = false;
+    			
+    			File fileFolder = new File("log/csv/"+IP);
+
+    			existsNumeric = fileFolder.exists();
+    			if(!existsNumeric){
+    				fileFolder.mkdirs();
+    			}
+
+    			File fileNumeric = new File(fileFolder,""+IP+"_"+resType.toString()+"_numeric.csv");
+    			File fileOthers = new File(fileFolder,""+IP+"_"+resType.toString()+"_others.csv");
+    			
+    			File fileTopKeys = new File(fileFolder,""+IP+"_"+resType.toString()+"_topKeys.csv");
+    			if(resType.equals(ResourceType.JMX)){
+    				fileTopKeys = new File(fileFolder,""+IP+"_"+resType.toString()+"_topKeys.csv");
+    			}	
+
+    			existsNumeric = fileNumeric.exists();
+    			existsOthers = fileOthers.exists();
+    			
+    			if(resType.equals(ResourceType.JMX)){
+    				existsTopKeys = fileTopKeys.exists();
+    			}
+
+    			fosNumeric = new FileOutputStream(fileNumeric, true);
+    			outNumeric = new PrintStream(fosNumeric);
+    			fosOthers = new FileOutputStream(fileOthers, true);
+    			outOthers = new PrintStream(fosOthers);
+    			if(resType.equals(ResourceType.JMX)){
+    				fosTopKeys = new FileOutputStream(fileTopKeys, true);
+    				outTopKeys = new PrintStream(fosTopKeys);
+    			}
+    			
+    			String lineNumeric;
+    			String headerNumeric;
+    			String lineOthers;
+    			String headerOthers;
+    			String lineTopKeys;
+    			String headerTopKeys;
+    			if(outNumeric != null && numAttributes != 0){
+    				lineNumeric=""+timestamp+",";
+    				headerNumeric="Timestamp,";
+    				lineOthers=""+timestamp+",";
+    				headerOthers="Timestamp,";
+    				lineTopKeys=""+timestamp+",";
+    				headerTopKeys="Timestamp,";
+    				
+    				for(int i =0; i < numResources; i++){
+
+    					for(int j = 0; j<numAttributes; j++){
+
+    						if(allAttr[i][j] != null){
+    							if(allAttr[i][j].isNumeric() || allAttr[i][j].isBoolean()){
+    								atLeastOneNumeric = true;
+    								headerNumeric+=""+allAttr[i][j].getName()+"_"+i;
+    								if(allAttr[i][j].isBoolean()){
+    									if(allAttr[i][j].getValue() != null){
+    										if(((Boolean)allAttr[i][j].getValue()) == true){
+    											lineNumeric+=""+"1";
+    										}
+    										else{
+    											lineNumeric+=""+"0";
+    										}
+    									}
+    								}
+    								else{
+    									lineNumeric+=""+allAttr[i][j].getValue();
+    								}
+    								
+
+    								if(i != numResources -1 || j != numAttributes -1){
+    									headerNumeric+=",";
+    									lineNumeric+=",";
+
+    								}
+    							}
+    							else{
+    								if(resType.equals(ResourceType.JMX) && isTopKey(allAttr[i][j])){
+    									atLeastOneTopKeys = true;
+    									headerTopKeys+=""+allAttr[i][j].getName()+"_"+i;
+    									lineTopKeys+=""+allAttr[i][j].getValue();
+
+    									if(i != numResources -1 || j != numAttributes -1){
+    										headerTopKeys+=",";
+    										lineTopKeys+=",";
+
+    									}
+    								}
+    								else{
+    									atLeastOneOthers = true;
+    									headerOthers+=""+allAttr[i][j].getName()+"_"+i;
+    									lineOthers+=""+allAttr[i][j].getValue();
+
+    									if(i != numResources -1 || j != numAttributes -1){
+    										headerOthers+=",";
+    										lineOthers+=",";
+
+    									}
+    								}
+
+    							}
+    						}	
+
+    					}
+
+    				}
+    				
+    				if(atLeastOneNumeric){
+    					if(!existsNumeric){
+    						outNumeric.println(headerNumeric);
+    					}
+    					outNumeric.println(lineNumeric);
+    					outNumeric.flush();
+    				}
+    				if(atLeastOneOthers){
+    					if(!existsOthers){
+    						outOthers.println(headerOthers);
+    					}
+    					outOthers.println(lineOthers);
+    					outOthers.flush();
+    				}
+    				if(atLeastOneTopKeys){
+    					if(!existsTopKeys){
+    						outTopKeys.println(headerTopKeys);
+    					}
+    					outTopKeys.println(lineTopKeys);
+    					outTopKeys.flush();
+    				}
+    				
+    				
+
+    				return allAttr;
+    			}
+    		} catch (FileNotFoundException e) {
+    			e.printStackTrace();
+    		}
+    		finally{
+    			if(outNumeric != null){
+    				outNumeric.close();
+    			}
+
+    			if(fosNumeric != null){
+    				try {
+    					fosNumeric.close();
+    				} catch (IOException e) {
+    					e.printStackTrace();
+    				}
+    			}
+    		}
+    	}
+
+    	return null;
+		
+	}
+    
+    
+	
 	private boolean checkJmxMembers(Measurement mis) {
 	
 		boolean result = false;
@@ -401,7 +1206,7 @@ public class LogServiceAnalyzer implements Runnable{
 			
 			if(timestamp == null){//New Member
 				
-				
+				System.out.println("New member detected: "+mis.getIp());
 				result = true;
 				
 			}
@@ -416,15 +1221,16 @@ public class LogServiceAnalyzer implements Runnable{
 				if(ma.getShort_name().equalsIgnoreCase("numNodes")){
 					this.numJmxNodes = Long.parseLong(ma.getValue());
 					
+					if(result == true){
+						System.out.println("..and the number of nodes is: "+this.numJmxNodes);
+					}
 				}
 				
 			}
 			
 			this.numCheckJmxNodes++;
-			
-			
+			/*
 			if(numCheckJmxNodes > 2*this.numJmxNodes){
-				
 				
 				numCheckJmxNodes = 0;
 				
@@ -464,11 +1270,453 @@ public class LogServiceAnalyzer implements Runnable{
 					
 				}
 				
-			}
+			}*/
 		}
 		
 		
 		return result;
+	}
+	
+	private static PublishAttribute[] toArray(Map<String, PublishAttribute> attr, int resIndex){
+		
+		
+		
+		if(attr!=null){
+			
+			int size = attr.size();
+			int offset;
+			if(size > 0){
+				PublishAttribute[] result = new PublishAttribute[size];
+				Collection<PublishAttribute> collection = attr.values();
+				
+				for(PublishAttribute pa: collection){
+					offset = pa.getAttributeIndex() - (size * resIndex);
+					result[offset] = pa;
+					
+					
+				}
+				
+				
+				return result;
+			}
+			
+		}
+		
+		
+		return null;
+	}
+	
+	
+	private Aggregation getAggregationType(PublishAttribute attr){
+		
+		if(attr != null){
+
+			//CPU
+			if(attr.getName().equalsIgnoreCase("CpuPerc.sys")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("CpuPerc.user")){
+				return Aggregation.MEAN;
+			}
+
+			//NETWORK
+			else if(attr.getName().equalsIgnoreCase("receivedBytes")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("transmittedBytes")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("receivedBytesPerSecond")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("transmittedBytesPerSecond")){
+				return Aggregation.SUM;
+			}
+
+
+			//DISK
+			else if(attr.getName().equalsIgnoreCase("fileSystemUsage.usePercent")){
+				return Aggregation.MEAN;
+			}
+
+
+			//MEMORY
+			else if(attr.getName().equalsIgnoreCase("MemoryInfo.free")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("MemoryInfo.used")){
+				return Aggregation.SUM;
+			}
+
+
+
+			//JMX
+			else if(attr.getName().equalsIgnoreCase("ConcurrencyLevel")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfLocksAvailable")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfLocksHeld")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("SuccessRatioFloatingPoint")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AverageReplicationTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("ReplicationFailures")){
+				return Aggregation.SUM;
+			}
+			//else if(attr.getName().equalsIgnoreCase("SuccessRatio")){
+			//	return Aggregation.MEAN;
+			//}
+			else if(attr.getName().equalsIgnoreCase("ReplicationCount")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AverageWriteTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("TimeSinceReset")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AverageReadTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("HitRatio")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfEntries")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Evictions")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("RemoveMisses")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("ReadWriteRatio")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("ElapsedTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("Hits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("RemoveHits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Stores")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Misses")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("CoolDownTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("MaxNumberOfKeysToRequest")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("UsagePercentage")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("CorePoolSize")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("MaximumPoolSize")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("KeepAliveTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRollbackAsync")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLocalLockHoldTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteTxCompleteNotifyTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("PercentageWriteTransactions")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLocalCommitTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfRemotePuts")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgWriteTxLocalExecution")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgWriteTxDuration")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemotePrepareTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLocalGetTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLockWaitingTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRollbackTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRollbackRtt")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumOfLockSuccessLocalTx")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumAbortedTxDueTimeout")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalContentionProbability")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgCommitAsync")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumAbortedTxDueDeadlock")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("RemoteGetExecutionTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLocalRollbackTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgPutsPerWrTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgTCBTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumOfLockRemoteTx")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgCompleteNotificationAsync")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgClusteredGetCommandSize")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgResponseTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteRollbackTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("ReplicationDegree")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfCommits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumNodes")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNTCBTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumPutsBySuccessfulLocalTx")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgPrepareRtt")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteLockHoldTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("WriteSkewProbability")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLocalPrepareTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteGetsPerROTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("PercentageSuccessWriteTransactions")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumNodesCompleteNotification")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumNodesPrepare")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("ApplicationContentionFactor")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfGets")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgLockHoldTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgReadOnlyTxDuration")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteGetsPerWrTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgCommitCommandSize")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgCommitRtt")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemotePutsPerWrTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("RemoteContentionProbability")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteGetRtt")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumNodesRemoteGet")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfRemoteGets")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgPrepareCommandSize")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfPuts")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumOfLockLocalTx")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgTxArrivalRate")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalExecutionTimeWithoutLock")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgRemoteCommitTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgAbortedWriteTxDuration")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgCommitTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("RemotePutExecutionTime")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AbortRate")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgGetsPerWrTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumNodesRollback")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgNumNodesCommit")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("NumberOfLocalCommits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("LockContentionProbability")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("Throughput")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgPrepareAsync")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgGetsPerROTransaction")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalActiveTransactions")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalRollbacks")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Prepares")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Rollbacks")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalCommits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("Commits")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgFailedTxCommit")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("AvgSuccessfulTxCommit")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("SuccessfulCommits")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("FailedCommits")){
+				return Aggregation.MEAN;
+			}
+			else if(attr.getName().equalsIgnoreCase("LocalPrepares")){
+				return Aggregation.SUM;
+			}
+			else if(attr.getName().equalsIgnoreCase("AverageValidationDuration:")){
+				return Aggregation.MEAN;
+			}
+
+		}
+		return Aggregation.NO;
+	}
+	
+	private boolean isTopKey(PublishAttribute attr){
+		
+		if(attr != null){
+			
+			String name = attr.getName();
+			
+			if(name.equalsIgnoreCase("TopLockFailedKeys")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("RemoteTopGets")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("TopWriteSkewFailedKeys")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("LocalTopPuts")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("TopContendedKeys")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("RemoteTopPuts")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("LocalTopGets")){
+				return true;
+			}
+			else if(name.equalsIgnoreCase("TopLockedKeys")){
+				return true;
+			}
+			
+		}
+		
+		return false;
 	}
 
 	private void loadParametersFromRegistry(){
@@ -486,7 +1734,12 @@ public class LogServiceAnalyzer implements Runnable{
 		enableListeners = Boolean.parseBoolean(props.getProperty("enableListeners"));
     }
 	
-	
+	private enum Aggregation{
+		
+		NO, MEAN, SUM
+		
+		
+	}
 		
 		
 	private class KnownMember implements Comparable<KnownMember>{

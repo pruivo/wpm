@@ -56,6 +56,9 @@ public class WPMParser{
 				String aux = attributesLineParsed.nextToken();
 				//System.out.println(aux);
 				StringTokenizer attribute = new StringTokenizer(aux," ");
+				if(attribute.countTokens()<2){//To double check that the attribute has all the required fields
+					continue;
+				}
 				att.setAttribute_index(Integer.parseInt(attribute.nextToken().replace(":", "")));//attribute index field
 				String complete_short_name = attribute.nextToken();//short name + resource index field
 				complete_short_name = complete_short_name.replaceAll(":", "");
@@ -76,9 +79,11 @@ public class WPMParser{
 					
 				att.setJava_type(attribute.nextToken());//java type field
 				att.setValue(attribute.nextToken());// value field
+				
 				attributesList.add(att);
 			}
 			entry.setMeasurementAttributes(attributesList);
+		
 		} catch (Exception e) {
 			e.printStackTrace();
 			System.out.println("String with error: "+strLine);

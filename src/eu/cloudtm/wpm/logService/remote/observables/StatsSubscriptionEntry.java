@@ -244,20 +244,23 @@ public class StatsSubscriptionEntry {
 					if("DOUBLE".equals(current.getJava_type())){
 						
 						
-						result.add(new PublishAttribute<Double>(rt, current.getResource_index(), current.getShort_name(), Double.parseDouble(current.getValue())));
+						result.add(new PublishAttribute<Double>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), Double.parseDouble(current.getValue())));
 						
 					}
 					else if("INTEGER".equals(current.getJava_type())){
-						result.add(new PublishAttribute<Integer>(rt, current.getResource_index(), current.getShort_name(), Integer.parseInt(current.getValue())));
+						result.add(new PublishAttribute<Integer>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), Integer.parseInt(current.getValue())));
 					}
 					else if("STRING".equals(current.getJava_type())){
-						result.add(new PublishAttribute<String>(rt, current.getResource_index(), current.getShort_name(), current.getValue()));
+						result.add(new PublishAttribute<String>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), current.getValue()));
 					}
 					else if("FLOAT".equals(current.getJava_type())){
-						result.add(new PublishAttribute<Float>(rt, current.getResource_index(), current.getShort_name(), Float.parseFloat(current.getValue())));
+						result.add(new PublishAttribute<Float>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), Float.parseFloat(current.getValue())));
 					}
 					else if("LONG".equals(current.getJava_type())){
-						result.add(new PublishAttribute<Long>(rt, current.getResource_index(), current.getShort_name(), Long.parseLong(current.getValue())));
+						result.add(new PublishAttribute<Long>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), Long.parseLong(current.getValue())));
+					}
+					else if("BOOLEAN".equals(current.getJava_type())){
+						result.add(new PublishAttribute<Boolean>(rt, current.getResource_index(), current.getAttribute_index(), current.getShort_name(), Boolean.parseBoolean(current.getValue())));
 					}
 					
 				}
