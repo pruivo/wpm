@@ -103,6 +103,7 @@ public class LogServiceAnalyzer implements Runnable{
 	private long numCheckJmxNodes = 0;
 	
 	private StatsSubscriptionEntry csvFileStaticLocalSubscription;
+
 	
 	public LogServiceAnalyzer() throws RemoteException{
 		loadParametersFromRegistry();
@@ -717,6 +718,13 @@ public class LogServiceAnalyzer implements Runnable{
 					result = new PublishAttribute[current.length];
 					
 					for(int i = 0; i < current.length; i++){
+						/*
+						if("NumNodes".equalsIgnoreCase(current[i].getName())){
+							System.out.println(" ");
+							System.out.println("--- Aggregation Num Nodes ---");
+							
+						}
+						*/
 						
 						if(getAggregationType(current[i]) == Aggregation.NO){
 							
@@ -726,6 +734,13 @@ public class LogServiceAnalyzer implements Runnable{
 						else{
 							result[i] = new PublishAttribute(current[i].getResourceType(), current[i].getResourceIndex(), current[i].getAttributeIndex(), current[i].getName(), current[i].getValue());
 						}
+						/*
+						if("NumNodes".equalsIgnoreCase(current[i].getName())){
+							System.out.println((numSeenSamples+1)+") Num Nodes: "+current[i].getValue());
+							System.out.println("Num Nodes at index: "+i);
+							
+						}
+						*/
 						
 					}
 					
@@ -735,6 +750,14 @@ public class LogServiceAnalyzer implements Runnable{
 					for(int i = 0; i < current.length; i++){
 						
 						aggregate(result[i], current[i], getAggregationType(current[i]), numSeenSamples);
+						/*
+						if("NumNodes".equalsIgnoreCase(current[i].getName())){
+							System.out.println((numSeenSamples+1)+") Num Nodes: "+current[i].getValue());
+							System.out.println("Current aggregation for Num Nodes: "+ result[i].getValue());
+							System.out.println("Num Nodes at index: "+i);
+							
+						}
+						*/
 						
 					}
 					
@@ -876,6 +899,12 @@ public class LogServiceAnalyzer implements Runnable{
 		Object partialValue = result.getValue();
 		Object newSampleValue = newSample.getValue();
 		
+		/*
+		if("NumNodes".equalsIgnoreCase(newSample.getName())){
+			System.out.println("Aggregation of "+newSampleValue+" on "+partialValue+" for Num Nodes");
+		}
+		*/
+		
 		if(partialValue == null || newSampleValue == null){
 			
 			return;
@@ -928,7 +957,11 @@ public class LogServiceAnalyzer implements Runnable{
 		}
 		else if (aggrType == Aggregation.MEAN){
 			if(numSeenSamples > 0){
-				
+				/*
+				if("NumNodes".equalsIgnoreCase(newSample.getName())){
+					System.out.println("Operation in aggregation for Num Nodes: "+"("+partialDoubleValue+ "/"+ "("+numSeenSamples+"*1.0D)"+ "+" + newSampleDoubleValue+")"+ "/"+ "(("+numSeenSamples+"+1)*1.0D))");
+				}
+				*/
 				result.setValue((partialDoubleValue / (numSeenSamples*1.0D) + newSampleDoubleValue) / ((numSeenSamples+1)*1.0D));
 				
 			}
@@ -1017,7 +1050,7 @@ public class LogServiceAnalyzer implements Runnable{
     		PublishMeasurement pm;
     		for(int i = 0; i < numResources; i++){
     			pm = pse.getPublishMeasurement(resType, i, IP); 
-    			current = toArray(pm.getValues(), i);
+    			current = toArray(pm.getValues(), i, resType);
     			allAttr[i] = current;
     			if(current != null){
     				numAttributes = current.length;
@@ -1277,7 +1310,7 @@ public class LogServiceAnalyzer implements Runnable{
 		return result;
 	}
 	
-	private static PublishAttribute[] toArray(Map<String, PublishAttribute> attr, int resIndex){
+	private static PublishAttribute[] toArray(Map<String, PublishAttribute> attr, int resIndex, ResourceType resType){
 		
 		
 		
@@ -1288,10 +1321,13 @@ public class LogServiceAnalyzer implements Runnable{
 			if(size > 0){
 				PublishAttribute[] result = new PublishAttribute[size];
 				Collection<PublishAttribute> collection = attr.values();
-				
+					
 				for(PublishAttribute pa: collection){
-					offset = pa.getAttributeIndex() - (size * resIndex);
+					
+					
+					offset = ClusterWidePublishAttributeIndexGenerator.getInstance().getId(pa.getName(), resType);
 					result[offset] = pa;
+					
 					
 					
 				}
