@@ -222,11 +222,15 @@ public class LogServiceAnalyzer implements Runnable{
 					            			String[] addresses = new String[size];
 					            			
 					            			int i = 0;
+					            			
+					            			System.out.println("--- View Change ---");
 					            			for(String key: set){
 					            				addresses[i] = key;
+					            				System.out.println(key);
 					            				i++;
 					            				
 					            			}
+					            			System.out.println("-------------------");
 					            			
 					            			this.csvFileStaticLocalSubscription = new StatsSubscriptionEntry(null, addresses, null);//No handle and no remote listener here
 					            			
@@ -1253,16 +1257,17 @@ public class LogServiceAnalyzer implements Runnable{
 				
 				if(ma.getShort_name().equalsIgnoreCase("numNodes")){
 					this.numJmxNodes = Long.parseLong(ma.getValue());
-					
+					/*
 					if(result == true){
 						System.out.println("..and the number of nodes is: "+this.numJmxNodes);
 					}
+					*/
 				}
 				
 			}
 			
 			this.numCheckJmxNodes++;
-			/*
+			
 			if(numCheckJmxNodes > 2*this.numJmxNodes){
 				
 				numCheckJmxNodes = 0;
@@ -1285,11 +1290,11 @@ public class LogServiceAnalyzer implements Runnable{
 				if(toRemove > 0){
 					
 					result = true;
-					
+					KnownMember removed;
 					for(int i=0; i< toRemove; i++){
 						
-						all.remove(0);
-						
+						removed = all.remove(0);
+						System.out.println("Removed: "+removed);
 					}
 					
 					
@@ -1303,7 +1308,7 @@ public class LogServiceAnalyzer implements Runnable{
 					
 				}
 				
-			}*/
+			}
 		}
 		
 		
@@ -1784,7 +1789,7 @@ public class LogServiceAnalyzer implements Runnable{
 		long delta;
 		
 		
-		public KnownMember(String addres, long delta){
+		public KnownMember(String address, long delta){
 			
 			
 			this.address = address;
@@ -1809,6 +1814,14 @@ public class LogServiceAnalyzer implements Runnable{
 				return 0;
 			}
 		}
+
+		@Override
+		public String toString() {
+			return "KnownMember [address=" + address + ", delta=" + delta + "]";
+		}
+		
+		
+		
 	}	
 		
 	
