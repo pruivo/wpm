@@ -83,7 +83,7 @@ import eu.cloudtm.wpm.parser.*;
 */
 public class LogServiceAnalyzer implements Runnable{
 	
-	private static final int RMI_REGISTRY_PORT = 1099;
+	private static int RMI_REGISTRY_PORT = 1099;
 	
 	static final int filesize = 2048;
 	private Cache<String,String> cache;
@@ -103,11 +103,13 @@ public class LogServiceAnalyzer implements Runnable{
 	private long numCheckJmxNodes = 0;
 	
 	private StatsSubscriptionEntry csvFileStaticLocalSubscription;
+	
+	private HashMap<String, Aggregation> aggregationTypes;
 
 	
 	public LogServiceAnalyzer() throws RemoteException{
 		loadParametersFromRegistry();
-		
+		loadAggregationTypesFromRegistry();
 		
 		if(enableInfinispan){
 			GlobalConfiguration gc = GlobalConfiguration.getClusteredDefault();
@@ -1350,8 +1352,37 @@ public class LogServiceAnalyzer implements Runnable{
 	
 	private Aggregation getAggregationType(PublishAttribute attr){
 		
+		Aggregation a = null;
+		if(attr!=null){
+			if(this.aggregationTypes != null){
+				a = aggregationTypes.get(attr.getName().toLowerCase());
+				//if(a!=null)
+				//	System.out.println("Aggregation: "+attr.getName()+" -> "+a);
+			}
+			
+			if(a==null){
+				if((attr.getValue() instanceof Integer) ||
+						(attr.getValue() instanceof Long)||
+						(attr.getValue() instanceof Double)||
+						(attr.getValue() instanceof Float)){
+					a = Aggregation.MEAN;
+					//System.out.println("Aggregation: "+attr.getName()+" -> default "+a);
+				}
+				else{
+					a=Aggregation.NO;
+					//System.out.println("Aggregation: "+attr.getName()+" -> default "+a);
+				}
+			}
+		}
+		else{
+			a = Aggregation.NO;
+		}
+		
+		return a;
+		
+		/*
 		if(attr != null){
-
+			
 			//CPU
 			if(attr.getName().equalsIgnoreCase("CpuPerc.sys")){
 				return Aggregation.MEAN;
@@ -1719,9 +1750,13 @@ public class LogServiceAnalyzer implements Runnable{
 			else if(attr.getName().equalsIgnoreCase("AverageValidationDuration:")){
 				return Aggregation.MEAN;
 			}
+			
+			
 
 		}
 		return Aggregation.NO;
+		
+		*/
 	}
 	
 	private boolean isTopKey(PublishAttribute attr){
@@ -1773,6 +1808,11 @@ public class LogServiceAnalyzer implements Runnable{
 		timeout = Long.parseLong(props.getProperty("AnalyzerThreadTimeout"));
 		enableInfinispan = Boolean.parseBoolean(props.getProperty("enableInfinispan"));
 		enableListeners = Boolean.parseBoolean(props.getProperty("enableListeners"));
+		
+		String rmiPortNumber = props.getProperty("RMIPort_number");
+		if(rmiPortNumber != null){
+			RMI_REGISTRY_PORT = Integer.parseInt(rmiPortNumber);
+		}
     }
 	
 	private enum Aggregation{
@@ -1781,6 +1821,39 @@ public class LogServiceAnalyzer implements Runnable{
 		
 		
 	}
+	
+	private void loadAggregationTypesFromRegistry(){
+    	String propsFile = "config/stats_aggregation.config";
+    	Properties props = new Properties();
+		try {
+			props.load(new FileInputStream(propsFile));
+			
+			this.aggregationTypes = new HashMap<String, Aggregation>();
+			
+			Set<String> keys = props.stringPropertyNames();
+			String value;
+			for(String k: keys){
+				
+				value = props.getProperty(k);
+				
+				if("MEAN".equalsIgnoreCase(value)){
+					this.aggregationTypes.put(k.toLowerCase(), Aggregation.MEAN);
+				}
+				else if("SUM".equalsIgnoreCase(value)){
+					this.aggregationTypes.put(k.toLowerCase(), Aggregation.SUM);
+				}
+				else if("NONE".equalsIgnoreCase(value)){
+					this.aggregationTypes.put(k.toLowerCase(), Aggregation.NO);
+				}
+				
+			}
+			
+			
+		} catch (IOException e1) {
+			e1.printStackTrace();
+		}
+		
+    }
 		
 		
 	private class KnownMember implements Comparable<KnownMember>{
