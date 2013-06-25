@@ -37,10 +37,18 @@ import java.util.Properties;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.consumer.AckConsumer;
+
 /*
 * @author Roberto Palmieri
 */
 public class LogServiceAck implements Runnable{
+	
+	private final static Logger log = Logger.getLogger(LogServiceAck.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private int consumer_port;
 	private long timeout;
 	
@@ -59,7 +67,8 @@ public class LogServiceAck implements Runnable{
 				e.printStackTrace();
 			}
 			try {
-				//System.out.println("Running Log Service Ack Thread!!");
+				if(INFO)
+					log.info("Running Log Service Ack Thread!!");
 				File active_folder = new File("log/ls_worked");
 				if(active_folder.isDirectory()){
 					for(File activeFile : active_folder.listFiles()){
@@ -83,13 +92,17 @@ public class LogServiceAck implements Runnable{
 							DataInputStream dis = new DataInputStream(is);
 							
 							sendFile(activeFile,dos);
-							//System.out.println("Ack sent for file "+activeFile.getName());
+							if(INFO)
+								log.info("Ack sent for file "+activeFile.getName());
 							String msg = receiveAck(dis);
-							//System.out.println("Ack received "+msg);
+							if(INFO)
+								log.info("Ack received "+msg);
 							if(msg.equals("ACK"))
 								activeFile.delete();
-							else if(msg.equals("NACK"))
-								System.out.println("NACK received");
+							else if(msg.equals("NACK")){
+								if(INFO)
+									log.info("NACK received");
+							}	
 							dos.close();
 							dis.close();
 				            os.close();
@@ -122,12 +135,14 @@ public class LogServiceAck implements Runnable{
 			FileInputStream fis = new FileInputStream(file);
 			BufferedInputStream bis = new BufferedInputStream(fis);
 			byte [] fileInByte = new byte [(int)file.length()];
-			//System.out.println("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
+			if(INFO)
+				log.info("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
 			dos.writeInt(file.getName().getBytes().length);
 			dos.flush();
 			dos.write(file.getName().getBytes());
 			dos.flush();
-			//System.out.println("FileName written");
+			if(INFO)
+				log.info("FileName written");
 			dos.writeInt((int)file.length());
 			dos.flush();
 			bis.read(fileInByte, 0, fileInByte.length);
@@ -135,7 +150,8 @@ public class LogServiceAck implements Runnable{
 			dos.flush();
             bis.close();
             fis.close();
-            //System.out.println("File "+file.getName()+" sent!!");
+            if(INFO)
+            	log.info("File "+file.getName()+" sent!!");
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

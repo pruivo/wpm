@@ -40,7 +40,10 @@ import javax.management.MalformedObjectNameException;
 import javax.management.ObjectName;
 import javax.management.ReflectionException;
 
+import org.apache.log4j.Logger;
+
 import eu.cloudtm.resources.MonitorableResources;
+import eu.cloudtm.wpm.consumer.AckConsumer;
 import eu.reservoir.monitoring.core.AbstractProbe;
 import eu.reservoir.monitoring.core.DefaultProbeAttribute;
 import eu.reservoir.monitoring.core.DefaultProbeValue;
@@ -52,10 +55,15 @@ import eu.reservoir.monitoring.core.ProducerMeasurement;
 import eu.reservoir.monitoring.core.Rational;
 import eu.reservoir.monitoring.core.TypeException;
 
-/*
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class InfinispanResourceProbe extends AbstractProbe implements Probe {
+	
+	private final static Logger log = Logger.getLogger(InfinispanResourceProbe.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	static InfinispanInfo monitored_infinispan;
 	static String addr;
 	static int port_num; 
@@ -130,7 +138,8 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 						addProbeAttribute(new DefaultProbeAttribute(attributeKey++, nameAttribute, ProbeAttributeType.SHORT, ""));
 					}else{
 						addProbeAttribute(new DefaultProbeAttribute(attributeKey++, nameAttribute, ProbeAttributeType.STRING, ""));
-						System.out.println(att.getType());
+						if(INFO)
+							log.info(att.getType());
 						//throw new RuntimeException("Format not supported!");
 					}
 					//System.out.println("Added "+att.getName()+":"+(attributeKey-1));
@@ -159,7 +168,8 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 	}
 	
 	public ProbeMeasurement collect() {
-		System.out.println("Start collecting Infinispan Probe at: "+System.currentTimeMillis());
+		if(INFO)
+			log.info("Start collecting Infinispan Probe at: "+System.currentTimeMillis());
 		// list of proble values
 		ArrayList<ProbeValue> list = new ArrayList<ProbeValue>();
 		int attributeKey = 0;
@@ -266,7 +276,8 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 			try {
 				InetAddress thisIp = InetAddress.getLocalHost();
 				addr = thisIp.getHostAddress();
-				System.out.println("Infinispan probe attached to "+addr);
+				if(INFO)
+					log.info("Infinispan probe attached to "+addr);
 			} catch (UnknownHostException e) {
 				e.printStackTrace();
 			}

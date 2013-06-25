@@ -60,12 +60,14 @@ import java.util.zip.ZipInputStream;
 import javax.rmi.ssl.SslRMIClientSocketFactory;
 import javax.rmi.ssl.SslRMIServerSocketFactory;
 
+import org.apache.log4j.Logger;
 import org.infinispan.Cache;
 import org.infinispan.config.Configuration;
 import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 
+import eu.cloudtm.wpm.consumer.AckConsumer;
 import eu.cloudtm.wpm.logService.remote.observables.*;
 
 import eu.cloudtm.wpm.logService.remote.events.*;
@@ -77,11 +79,14 @@ import eu.cloudtm.wpm.logService.remote.publisher.*;
 import eu.cloudtm.wpm.parser.*;
 
 
-/*
+/**
 * @author Roberto Palmieri
 * @author Sebastiano Peluso
 */
 public class LogServiceAnalyzer implements Runnable{
+	
+	private final static Logger log = Logger.getLogger(LogServiceAnalyzer.class);
+	private final static boolean INFO = log.isInfoEnabled();
 	
 	private static int RMI_REGISTRY_PORT = 1099;
 	
@@ -123,7 +128,8 @@ public class LogServiceAnalyzer implements Runnable{
 			this.cache = cm.getCache();
 
 		}
-		//System.out.println("Running Log Service Analyzer Thread!!");
+		if(INFO)
+			log.info("Running Log Service Analyzer Thread!!");
 		
 		//TransactionManager tm = cache.getAdvancedCache().getTransactionManager();+
 		
@@ -155,8 +161,11 @@ public class LogServiceAnalyzer implements Runnable{
 				e.printStackTrace();
 			}
 			try {
-				//System.out.println("Dataitem in cache: "+cache.size());
-				//System.out.println("Running Log Service Analyzer Thread!!");
+				if(INFO){
+					if(cache!=null)
+						log.info("Dataitem in cache: "+cache.size());
+					log.info("Running Log Service Analyzer Thread!!");
+				}
 				File active_folder = new File("log/ls_processed");
 				if(active_folder.isDirectory()){
 					for(File activeFile : active_folder.listFiles()){
@@ -174,7 +183,8 @@ public class LogServiceAnalyzer implements Runnable{
 						    	nameFileToStore = "log/ls_worked/"+entry.getName();
 						    	fos = new FileOutputStream(nameFileToStore);
 						    	BufferedOutputStream dest = new BufferedOutputStream(fos, filesize);
-								//System.out.println("Extracting: " +entry.getName());
+						    	if(INFO)
+						    		log.info("Extracting: " +entry.getName());
 								while ((count = zis.read(logFileByteArray, 0, filesize)) != -1) {
 									dest.write(logFileByteArray, 0, count);
 								}
@@ -182,16 +192,19 @@ public class LogServiceAnalyzer implements Runnable{
 						    }
 						    fos.close();
 						    zis.close();
-						    //System.out.println("File decompressed stored");
+						    if(INFO)
+						    	log.info("File decompressed stored");
 						    //Create ack file
 						    File ackFile = new File("log/ls_worked/"+activeFile.getName().substring(0,activeFile.getName().lastIndexOf(".zip"))+".ack");
-				            if(!ackFile.createNewFile())
-				            	System.out.println("Error while creating ack file");
-				          
+				            if(!ackFile.createNewFile()){
+				            	if(INFO)
+				            		log.info("Error while creating ack file");
+				            	
+				            }
 				            
 				            
-				            
-				            //System.out.println ("Ack file stored: "+ackFile.getPath());
+				            if(INFO)
+				            	log.info("Ack file stored: "+ackFile.getPath());
 				            if(enableInfinispan || enableListeners){
 				            	//timestamp nomeMetrica:valore;nomeMetrica:valore;nomeMetrica:valore
 				            	String strLine = "";
@@ -203,7 +216,8 @@ public class LogServiceAnalyzer implements Runnable{
 				            	boolean membersChanged = false;
 				            	
 				            	while ((strLine = br.readLine()) != null){
-				            		//System.out.println("Data received by LogService before Parsing:\n"+strLine);
+				            		if(INFO)
+				            			log.info("Data received by LogService before Parsing:\n"+strLine);
 				            		Measurement mis = WPMParser.parseLine(strLine);
 				            		if(mis == null)
 				            			continue;
@@ -298,8 +312,10 @@ public class LogServiceAnalyzer implements Runnable{
 				            					SimpleDateFormat sdf = new SimpleDateFormat("MMM dd,yyyy HH:mm");
 				            					date_format = sdf.format(new Date(mis.getTimestamp()));
 				            				}catch(Exception e){}
-				            				System.out.println("Put done! Id: "+identification_key+" timestap: "+date_format);
-				            				System.out.println("Put done! Value: "+payload);
+				            				if(INFO){
+				            					log.info("Put done! Id: "+identification_key+" timestap: "+date_format);
+				            					log.info("Put done! Value: "+payload);
+				            				}
 				            				if(mis.getResourceType() == ResourceType.DISK){
 				            					String [] att_vect = mis.getAttributesForInfinispan(i).split(";");
 				            					for(int k=0;k<att_vect.length;k++){
@@ -323,7 +339,8 @@ public class LogServiceAnalyzer implements Runnable{
 				            				}
 				            			}
 				            			String plats = cache.get("WPMPlatforms");
-				            			System.out.println("Platforms: "+plats);
+				            			if(INFO)
+				            				log.info("Platforms: "+plats);
 				            			switch(mis.getResourceType()){
 				            			case CPU 		: cache.put("WPMPlatform_NUM_CPUS:"+mis.getIp(), ""+num_of_res_ind);break;
 				            			case DISK 		: cache.put("WPMPlatfom_MOUNTING_PTS:"+mis.getIp(), ""+mis_spec);break;
@@ -331,11 +348,12 @@ public class LogServiceAnalyzer implements Runnable{
 				            			case JMX		: cache.put("WPMPlatfom_CACHES:"+mis.getIp(), "CloudTM");break;
 				            			default : if(mis.getResourceType() != ResourceType.MEMORY){ throw new RuntimeException("Error!");};
 				            			}
-				            			System.out.println("WPMPlatform_NUM_CPUS:"+mis.getIp()+": "+cache.get("WPMPlatform_NUM_CPUS:"+mis.getIp()));
-				            			System.out.println("WPMPlatfom_MOUNTING_PTS:"+mis.getIp()+": "+cache.get("WPMPlatfom_MOUNTING_PTS:"+mis.getIp()));
-				            			System.out.println("WPMPlatfom_NETWORKS:"+mis.getIp()+": "+cache.get("WPMPlatfom_NETWORKS:"+mis.getIp()));
-				            			System.out.println("WPMPlatfom_CACHES:"+mis.getIp()+": "+cache.get("WPMPlatfom_CACHES:"+mis.getIp()));
-
+				            			if(INFO){
+				            				log.info("WPMPlatform_NUM_CPUS:"+mis.getIp()+": "+cache.get("WPMPlatform_NUM_CPUS:"+mis.getIp()));
+				            				log.info("WPMPlatfom_MOUNTING_PTS:"+mis.getIp()+": "+cache.get("WPMPlatfom_MOUNTING_PTS:"+mis.getIp()));
+				            				log.info("WPMPlatfom_NETWORKS:"+mis.getIp()+": "+cache.get("WPMPlatfom_NETWORKS:"+mis.getIp()));
+				            				log.info("WPMPlatfom_CACHES:"+mis.getIp()+": "+cache.get("WPMPlatfom_CACHES:"+mis.getIp()));
+				            			}
 
 				            		}
 
@@ -349,23 +367,19 @@ public class LogServiceAnalyzer implements Runnable{
 				            		
 				            		//First try to publish for the static subscription (it produces the cvs files!!!)
 				            		
-				            		PublishStatsEventInternal staticToPublish = null;
+				            		PublishStatsEventInternal statsToPublish = null;
 				            		
 				            		if(this.csvFileStaticLocalSubscription != null){
 				            			
-				            			staticToPublish = this.csvFileStaticLocalSubscription.computePublishStatsEventInternal();
+				            			statsToPublish = this.csvFileStaticLocalSubscription.computePublishStatsEventInternal();
 				            		}
 				            		
 				            		
 				            			
-				            		//produce CSV here
-				            		produceCSV(staticToPublish, System.currentTimeMillis());
+				            		//produce CSV here. This method returns the aggregated stats if any.
+				            		AggregatedPublishAttributes aggregations = produceCSV(statsToPublish, System.currentTimeMillis());
 				            			
 				            			
-				            		
-				            		
-				            		
-				            		
 				            		
 				            		//Then try to publish for the dynamic subscriptions
 				            		
@@ -380,6 +394,12 @@ public class LogServiceAnalyzer implements Runnable{
 			            				
 			            				
 			            				toPublish[i] = itr.next().computePublishStatsEventInternal();
+			            				
+			            				if(toPublish[i]!=null){
+			            					
+			            					toPublish[i].addAggregations(aggregations);
+			            					
+			            				}
 			            				
 			            				i++;
 			            				
@@ -403,10 +423,15 @@ public class LogServiceAnalyzer implements Runnable{
 				            	
 				            	
 				            	
-				            	
-							    //System.out.println("Dataitem in cache: "+cache.size());
-							    if(!activeFile.delete())
-							    	System.out.println("ZIP file not delted!! "+activeFile);
+				            	if(INFO){
+				            		
+				            		if(cache != null)
+				            			log.info("Dataitem in cache: "+cache.size());
+				            	}
+				            	if(!activeFile.delete()){
+							    	if(INFO)
+							    		log.info("ZIP file not delted!! "+activeFile);
+							    }	
 							    //System.out.println("Deleted file: "+activeFile.getName());
 				            }
 						} catch (IOException e) {
@@ -420,7 +445,7 @@ public class LogServiceAnalyzer implements Runnable{
 		}
 	}
 	
-	private void produceCSV(PublishStatsEventInternal pei, long timestamp){
+	private AggregatedPublishAttributes produceCSV(PublishStatsEventInternal pei, long timestamp){
 
 		if(pei != null){
 			PublishStatisticsEvent pse = pei.getPerSubscriptionEvent();
@@ -538,26 +563,39 @@ public class LogServiceAnalyzer implements Runnable{
 					}
 
 					
-					PublishAttribute[] aggregatedCPU = produceAggregationFor(cpuStats);
-					PublishAttribute[] aggregatedMemory = produceAggregationFor(memoryStats);
-					PublishAttribute[] aggregatedDisk = produceAggregationFor(diskStats);
-					PublishAttribute[] aggregatedNetwork = produceAggregationFor(networkStats);
-					PublishAttribute[] aggregatedJmx = produceAggregationFor(jmxStats);
 					
-					produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork, aggregatedJmx, timestamp);
-					
-					//produceAggregatedCSVFor(ResourceType.CPU, cpuStats);
-					//produceAggregatedCSVFor(ResourceType.MEMORY, memoryStats);
-					//produceAggregatedCSVFor(ResourceType.DISK, diskStats);
-					//produceAggregatedCSVFor(ResourceType.NETWORK, networkStats);
-					//produceAggregatedCSVFor(ResourceType.JMX, jmxStats);
 
 
 				}
-
+				
+				PublishAttribute[] aggregatedCPU = produceAggregationFor(cpuStats);
+				PublishAttribute[] aggregatedMemory = produceAggregationFor(memoryStats);
+				PublishAttribute[] aggregatedDisk = produceAggregationFor(diskStats);
+				PublishAttribute[] aggregatedNetwork = produceAggregationFor(networkStats);
+				PublishAttribute[] aggregatedJmx = produceAggregationFor(jmxStats);
+				
+				AggregatedPublishAttributes agg = new AggregatedPublishAttributes(timestamp);
+				agg.add(ResourceType.CPU, aggregatedCPU);
+				agg.add(ResourceType.MEMORY, aggregatedMemory);
+				agg.add(ResourceType.DISK, aggregatedDisk);
+				agg.add(ResourceType.NETWORK, aggregatedNetwork);
+				agg.add(ResourceType.JMX, aggregatedJmx);
+				
+				
+				produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork, aggregatedJmx, timestamp);
+				
+				//produceAggregatedCSVFor(ResourceType.CPU, cpuStats);
+				//produceAggregatedCSVFor(ResourceType.MEMORY, memoryStats);
+				//produceAggregatedCSVFor(ResourceType.DISK, diskStats);
+				//produceAggregatedCSVFor(ResourceType.NETWORK, networkStats);
+				//produceAggregatedCSVFor(ResourceType.JMX, jmxStats);
+					
+				return agg;
 			}
 
 		}
+		
+		return null;
 	}
 	
 	
@@ -724,13 +762,7 @@ public class LogServiceAnalyzer implements Runnable{
 					result = new PublishAttribute[current.length];
 					
 					for(int i = 0; i < current.length; i++){
-						/*
-						if("NumNodes".equalsIgnoreCase(current[i].getName())){
-							System.out.println(" ");
-							System.out.println("--- Aggregation Num Nodes ---");
-							
-						}
-						*/
+						
 						
 						if(getAggregationType(current[i]) == Aggregation.NO){
 							
@@ -740,13 +772,7 @@ public class LogServiceAnalyzer implements Runnable{
 						else{
 							result[i] = new PublishAttribute(current[i].getResourceType(), current[i].getResourceIndex(), current[i].getAttributeIndex(), current[i].getName(), current[i].getValue());
 						}
-						/*
-						if("NumNodes".equalsIgnoreCase(current[i].getName())){
-							System.out.println((numSeenSamples+1)+") Num Nodes: "+current[i].getValue());
-							System.out.println("Num Nodes at index: "+i);
-							
-						}
-						*/
+						
 						
 					}
 					
@@ -756,14 +782,7 @@ public class LogServiceAnalyzer implements Runnable{
 					for(int i = 0; i < current.length; i++){
 						
 						aggregate(result[i], current[i], getAggregationType(current[i]), numSeenSamples);
-						/*
-						if("NumNodes".equalsIgnoreCase(current[i].getName())){
-							System.out.println((numSeenSamples+1)+") Num Nodes: "+current[i].getValue());
-							System.out.println("Current aggregation for Num Nodes: "+ result[i].getValue());
-							System.out.println("Num Nodes at index: "+i);
-							
-						}
-						*/
+						
 						
 					}
 					
@@ -905,11 +924,7 @@ public class LogServiceAnalyzer implements Runnable{
 		Object partialValue = result.getValue();
 		Object newSampleValue = newSample.getValue();
 		
-		/*
-		if("NumNodes".equalsIgnoreCase(newSample.getName())){
-			System.out.println("Aggregation of "+newSampleValue+" on "+partialValue+" for Num Nodes");
-		}
-		*/
+		
 		
 		if(partialValue == null || newSampleValue == null){
 			
@@ -963,11 +978,7 @@ public class LogServiceAnalyzer implements Runnable{
 		}
 		else if (aggrType == Aggregation.MEAN){
 			if(numSeenSamples > 0){
-				/*
-				if("NumNodes".equalsIgnoreCase(newSample.getName())){
-					System.out.println("Operation in aggregation for Num Nodes: "+"("+partialDoubleValue+ "/"+ "("+numSeenSamples+"*1.0D)"+ "+" + newSampleDoubleValue+")"+ "/"+ "(("+numSeenSamples+"+1)*1.0D))");
-				}
-				*/
+				
 				result.setValue((partialDoubleValue / (numSeenSamples*1.0D) + newSampleDoubleValue) / ((numSeenSamples+1)*1.0D));
 				
 			}
@@ -1259,11 +1270,7 @@ public class LogServiceAnalyzer implements Runnable{
 				
 				if(ma.getShort_name().equalsIgnoreCase("numNodes")){
 					this.numJmxNodes = Long.parseLong(ma.getValue());
-					/*
-					if(result == true){
-						System.out.println("..and the number of nodes is: "+this.numJmxNodes);
-					}
-					*/
+					
 				}
 				
 			}
@@ -1356,8 +1363,7 @@ public class LogServiceAnalyzer implements Runnable{
 		if(attr!=null){
 			if(this.aggregationTypes != null){
 				a = aggregationTypes.get(attr.getName().toLowerCase());
-				//if(a!=null)
-				//	System.out.println("Aggregation: "+attr.getName()+" -> "+a);
+				
 			}
 			
 			if(a==null){
@@ -1366,11 +1372,11 @@ public class LogServiceAnalyzer implements Runnable{
 						(attr.getValue() instanceof Double)||
 						(attr.getValue() instanceof Float)){
 					a = Aggregation.MEAN;
-					//System.out.println("Aggregation: "+attr.getName()+" -> default "+a);
+					
 				}
 				else{
 					a=Aggregation.NO;
-					//System.out.println("Aggregation: "+attr.getName()+" -> default "+a);
+					
 				}
 			}
 		}

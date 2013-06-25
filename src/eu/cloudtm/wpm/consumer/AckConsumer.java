@@ -37,10 +37,17 @@ import java.net.Socket;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 
+import org.apache.log4j.Logger;
+
 /*
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class AckConsumer implements Runnable{
+	
+	private final static Logger log = Logger.getLogger(AckConsumer.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private int port_num;
 	private static final int filesize = 1024;
 	
@@ -61,16 +68,19 @@ public class AckConsumer implements Runnable{
 		DataOutputStream dos = null;
 		while(true){
 			try {
-				System.out.println("Consumer Ack Thread Waiting on port..."+port_num);
+				if(INFO)
+					log.info("Consumer Ack Thread Waiting on port..."+port_num);
 				Socket sock = servsock.accept();
-				System.out.println("Consumer Ack Thread accepted connection...");
+				if(INFO)
+					log.info("Consumer Ack Thread accepted connection...");
 				OutputStream os = sock.getOutputStream();
 				InputStream is = sock.getInputStream();
 				dos = new DataOutputStream (os);
 				DataInputStream dis = new DataInputStream(is);
 				//receive ack file
 				File ackFile = receiveFile(dis);
-				System.out.println("Ack File received "+ackFile.getName());
+				if(INFO)
+					log.info("Ack File received "+ackFile.getName());
 				File readyFile = new File("log/active/"+ackFile.getName().substring(0,ackFile.getName().indexOf(".ack"))+".ready");
 				if(readyFile.isFile()){
 					//readyFile.renameTo(new File("log/active/"+readyFile.getName().substring(0,readyFile.getName().indexOf(".ready"))+".del"));
@@ -127,7 +137,8 @@ public class AckConsumer implements Runnable{
 		    dest.flush();
 		    dest.close();
 		    fos.close();
-			System.out.println("File "+filename+" written!!");
+		    if(INFO)
+		    	log.info("File "+filename+" written!!");
 			return nameFileToStore;
 		}catch(Exception e){
 			e.printStackTrace();

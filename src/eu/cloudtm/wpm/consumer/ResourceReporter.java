@@ -35,6 +35,9 @@ import java.util.zip.CheckedOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.hw_probe.NetworkResourceProbe;
 import eu.reservoir.monitoring.core.Measurement;
 import eu.reservoir.monitoring.core.ProbeValue;
 import eu.reservoir.monitoring.core.Reporter;
@@ -42,10 +45,15 @@ import eu.reservoir.monitoring.core.plane.InfoPlane;
 import eu.reservoir.monitoring.distribution.ConsumerMeasurementWithMetaData;
 import eu.reservoir.monitoring.distribution.ConsumerMeasurementWithMetadataAndProbeName;
 
-/*
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class ResourceReporter implements Reporter {
+	
+	private final static Logger log = Logger.getLogger(ResourceReporter.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private InfoPlane infoModel;
 	private String id_consumer;
 	private long lastTimestamp;
@@ -78,10 +86,12 @@ public class ResourceReporter implements Reporter {
 			}else{
 				throw new RuntimeException("Unsupported measurement message");
 			}
-			System.out.println("File updated!!");
+			if(INFO)
+				log.info("File updated!!");
 			out.close();
 			if(currentTimestamp - lastTimestamp >= timeToRefresh){
-				System.out.print("Generating zip file...");
+				if(INFO)
+					log.info("Generating zip file...");
 				byte [] logFileByteArray  = new byte [(int)logFile.length()];
 				FileInputStream fis = new FileInputStream(logFile);
 				fis = new FileInputStream(logFile);
@@ -98,19 +108,23 @@ public class ResourceReporter implements Reporter {
 	            outZip.close();
 	            bis.close();
 	            fis.close();
-	            System.out.println("done!");
-	            System.out.println ("Zip file stored: "+logFile.getPath());
+	            if(INFO){
+	            	log.info("done!");
+	            	log.info("Zip file stored: "+logFile.getPath());
+	            }
 	            File checkFile = new File("log/active/"+logFileZip.getName().substring(0,logFileZip.getName().lastIndexOf(".zip"))+".check");
 	            FileWriter fw = new FileWriter(checkFile);
 	            BufferedWriter checkFile_writer = new BufferedWriter(fw);
 	            checkFile_writer.write(new String(""+checksum.getChecksum().getValue()));
 	            checkFile_writer.close();
 	            fw.close();
-	            System.out.println ("Check file stored: "+checkFile.getPath());
+	            if(INFO)
+	            	log.info("Check file stored: "+checkFile.getPath());
 	            File readyFile = new File("log/active/"+logFileZip.getName().substring(0,logFileZip.getName().lastIndexOf(".zip"))+".ready");
 	            if(!readyFile.createNewFile())
 	            	throw new RuntimeException("Error while creating ready file");
-	            System.out.println ("Ready file stored: "+readyFile.getPath());
+	            if(INFO)
+	            	log.info("Ready file stored: "+readyFile.getPath());
 				lastTimestamp = currentTimestamp;
 				logFile.delete();
 			}

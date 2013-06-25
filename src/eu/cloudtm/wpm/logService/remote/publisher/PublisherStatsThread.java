@@ -29,6 +29,7 @@ import java.util.HashMap;
 import java.util.Set;
 import java.util.Map.Entry;
 
+import eu.cloudtm.wpm.logService.remote.events.PublishAggregatedStatisticsEvent;
 import eu.cloudtm.wpm.logService.remote.events.PublishAttribute;
 import eu.cloudtm.wpm.logService.remote.events.PublishMeasurement;
 import eu.cloudtm.wpm.logService.remote.events.PublishStatisticsEvent;
@@ -79,6 +80,18 @@ public class PublisherStatsThread extends Thread{
 			}
 
 
+		}
+		
+		PublishAggregatedStatisticsEvent aggregatedStats = event.getAggregatedStatisticsEvent();
+		
+		if(aggregatedStats != null){
+			try{
+				event.getListener().onNewAggregatedStatistics(aggregatedStats);
+			} catch (RemoteException e) {
+				this.observableImpl.garbageCollect(event.getListener());
+			}
+			
+			
 		}
 
 	}

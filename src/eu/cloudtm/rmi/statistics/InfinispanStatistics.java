@@ -31,10 +31,17 @@ import java.lang.Thread.State;
 
 import javax.transaction.Transaction;
 
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.consumer.AckConsumer;
+
 /*
 * @author Roberto Palmieri
 */
 public class InfinispanStatistics implements Serializable {
+	
+	private final static Logger log = Logger.getLogger(InfinispanStatistics.class);
+	private final static boolean INFO = log.isInfoEnabled();
 	
 
 	private static final long serialVersionUID = 7450205779990714462L;
@@ -487,12 +494,13 @@ public class InfinispanStatistics implements Serializable {
         out.writeObject(totalRollbacksRO);
         out.writeObject(transactionsRO);
         out.writeObject(totalEvictions);
-
-		System.out.println("Write InifnispanStatistics Object");
+        if(INFO)
+        	log.info("Write InifnispanStatistics Object");
 	}
 	private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
 		//in.defaultReadObject();
-		System.out.println("Start Read InifnispanStatistics Object");
+		if(INFO)
+			log.info("Start Read InifnispanStatistics Object");
 		this.thread_state = (State) in.readObject();
 		this.hitTotalNoTXTime = (Long) in.readObject();
 		this.missTotalNoTXTime = (Long) in.readObject();
@@ -534,8 +542,8 @@ public class InfinispanStatistics implements Serializable {
         this.totalRollbacksRO = (Long) in.readObject();
         this.transactionsRO = (Long) in.readObject();
         this.totalEvictions = (Long) in.readObject();
-
-		System.out.println("Read InifnispanStatistics Object");
+        if(INFO)
+        	log.info("Read InifnispanStatistics Object");
 	}
 }
 

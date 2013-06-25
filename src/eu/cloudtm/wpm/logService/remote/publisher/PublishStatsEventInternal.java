@@ -25,9 +25,14 @@ package eu.cloudtm.wpm.logService.remote.publisher;
 
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Set;
 
+import eu.cloudtm.wpm.logService.remote.events.AggregatedPublishAttributes;
+import eu.cloudtm.wpm.logService.remote.events.PublishAggregatedStatisticsEvent;
+import eu.cloudtm.wpm.logService.remote.events.PublishAttribute;
 import eu.cloudtm.wpm.logService.remote.events.PublishStatisticsEvent;
 import eu.cloudtm.wpm.logService.remote.listeners.WPMStatisticsRemoteListener;
+import eu.cloudtm.wpm.parser.ResourceType;
 
 /*
 * @author Sebastiano Peluso
@@ -37,6 +42,8 @@ public class PublishStatsEventInternal {
 	private HashMap<String, PublishStatisticsEvent> perVMEvents;
 	
 	private PublishStatisticsEvent perSubscriptionEvent;
+	
+	private PublishAggregatedStatisticsEvent aggregatedStatsEvent;
 	
 	private WPMStatisticsRemoteListener listener;
 	
@@ -73,9 +80,32 @@ public class PublishStatsEventInternal {
 	public PublishStatisticsEvent getPerSubscriptionEvent(){
 		return this.perSubscriptionEvent;
 	}
+	
+	public PublishAggregatedStatisticsEvent getAggregatedStatisticsEvent(){
+		return this.aggregatedStatsEvent;
+	}
 
 	public WPMStatisticsRemoteListener getListener() {
 		return listener;
+	}
+	
+	
+	public void addAggregations(AggregatedPublishAttributes aggregations){
+		if(aggregations!=null && aggregations.hasAggregations()){
+			this.aggregatedStatsEvent = new PublishAggregatedStatisticsEvent();
+			
+			Set<ResourceType> resources = aggregations.getResources();
+			PublishAttribute[] attributes;
+			for(ResourceType r : resources){
+				
+				attributes = aggregations.get(r);
+				
+				if(attributes != null){
+					this.aggregatedStatsEvent.addMeasure(aggregations.getTimestamp(), r, attributes);
+				}
+				
+			}
+		}
 	}
 	
 	

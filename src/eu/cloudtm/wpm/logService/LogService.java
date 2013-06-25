@@ -45,10 +45,19 @@ import java.util.zip.CheckedInputStream;
 import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 
-/*
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.consumer.AckConsumer;
+
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class LogService {
+	
+	private final static Logger log = Logger.getLogger(LogService.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	static int port_num;
 	static final int filesize = 2048;
 
@@ -67,7 +76,8 @@ public class LogService {
 			ServerSocket servsock = getServer();
 			//-------
 			while (true) {
-				//System.out.println("Log Service Waiting...");
+				if(INFO)
+					log.info("Log Service Waiting...");
 				Socket sock = servsock.accept();
 				InputStream is = sock.getInputStream();
 				DataInputStream dis = new DataInputStream(is);
@@ -79,7 +89,8 @@ public class LogService {
 				dis.close();
 				is.close();
 				sock.close();
-				//System.out.println("Now I can process...");
+				if(INFO)
+					log.info("Now I can process...");
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -104,7 +115,8 @@ public class LogService {
 	}
 	
 	private static void checkZipFile(File checkFile, File zipFile){
-		//System.out.println("checking files...");
+		if(INFO)
+			log.info("checking files...");
 		try{
 			FileInputStream f_check_stream = new FileInputStream(checkFile);
 		    DataInputStream check_in = new DataInputStream(f_check_stream);
@@ -118,7 +130,8 @@ public class LogService {
 		    	try{
 		    		long fileCheck_cks = Long.parseLong(strLine);
 		    		long fileZip_cks = check.getChecksum().getValue();
-		    		//System.out.println(fileCheck_cks+"-"+fileZip_cks);
+		    		if(INFO)
+		    			log.info(fileCheck_cks+"-"+fileZip_cks);
 		    		if(fileCheck_cks == fileZip_cks){
 		    			copyfile(zipFile,new File("log/ls_processed/"+zipFile.getName()));
 			    		checkFile.delete();
@@ -155,7 +168,8 @@ public class LogService {
 		    dest.flush();
 		    dest.close();
 		    fos.close();
-			//System.out.println("File "+filename+" written!!");
+		    if(INFO)
+		    	log.info("File "+filename+" written!!");
 			return nameFileToStore;
 		}catch(Exception e){
 			e.printStackTrace();
@@ -175,7 +189,8 @@ public class LogService {
 			}
 			in.close();
 			out.close();
-			//System.out.println("File copied.");
+			if(INFO)
+				log.info("File copied.");
 		}catch(FileNotFoundException ex){
 			System.out.println(ex.getMessage() + " in the specified directory.");
 			System.exit(0);

@@ -34,6 +34,7 @@ import javax.management.remote.JMXServiceURL;
 /**
  * Display amount of free and used memory in the system.
  * @author Roberto Palmieri
+ * @author Sebastiano Peluso
  */
 public class InfinispanInfo {
 	
@@ -203,7 +204,7 @@ public class InfinispanInfo {
 					isConnected = true;
 				//isConnected = true;
 				if(isConnected)
-					System.out.println("Infinispan conntected...");
+					System.out.println("Infinispan connected...");
 				else{
 					System.out.println("Waiting for Infinispan...");
 					try {
@@ -249,7 +250,7 @@ public class InfinispanInfo {
 					isConnected = true;
 				//isConnected = true;
 				if(isConnected)
-					System.out.println("JBoss conntected...");
+					System.out.println("JBoss connected...");
 				else{
 					System.out.println("Waiting for JBoss...");
 					try {

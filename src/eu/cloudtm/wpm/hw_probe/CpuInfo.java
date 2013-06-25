@@ -25,15 +25,23 @@ package eu.cloudtm.wpm.hw_probe;
 
 import java.util.ArrayList;
 
+import org.apache.log4j.Logger;
 import org.hyperic.sigar.CpuPerc;
 import org.hyperic.sigar.Sigar;
 import org.hyperic.sigar.SigarException;
 
+import eu.cloudtm.wpm.consumer.AckConsumer;
+
 /**
- * @author Roberto Palmieri 
+ * @author Roberto Palmieri
+ * @author Sebastiano Peluso 
  * Display cpu information for each cpu found on the system.
  */
 public class CpuInfo{
+	
+	private final static Logger log = Logger.getLogger(CpuInfo.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private Sigar handle_sigar;
 	private int cpu_number;
 	
@@ -163,6 +171,7 @@ public class CpuInfo{
     }
 	*/
     public static void main(String[] args) throws Exception {
-        System.out.println(new CpuInfo().getCpuValues().size());
+    	if(INFO)
+    		log.info(new CpuInfo().getCpuValues().size());
     }
 }

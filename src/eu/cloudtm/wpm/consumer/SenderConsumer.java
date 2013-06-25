@@ -34,10 +34,20 @@ import java.net.UnknownHostException;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
-/*
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.producer.ResourcesController;
+
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class SenderConsumer implements Runnable{
+	
+	
+	private final static Logger log = Logger.getLogger(SenderConsumer.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private String logService_addr;
 	private int logService_port;
 	private long timeout;
@@ -59,7 +69,8 @@ public class SenderConsumer implements Runnable{
 				e.printStackTrace();
 			}
 			try {
-				System.out.println("Consumer Sender Thread active!!");
+				if(INFO)
+					log.info("Consumer Sender Thread active!!");
 				File active_folder = new File("log/active");
 				if(active_folder.isDirectory()){
 					for(File activeFile : active_folder.listFiles()){
@@ -84,9 +95,12 @@ public class SenderConsumer implements Runnable{
 					            sock.close();
 					            //delete ready file for make the comunication simple
 					            
-					            if(!activeFile.delete())
-							    	System.out.println("READY file not delted!! "+activeFile);
-							}
+					            if(!activeFile.delete()){
+					            	
+					            	if(INFO)
+					            		log.info("READY file not deleted!! "+activeFile);
+					            }
+					        }
 						}catch(Exception e){
 							e.printStackTrace();
 						}
@@ -102,7 +116,8 @@ public class SenderConsumer implements Runnable{
 			FileInputStream fis = new FileInputStream(file);
 			BufferedInputStream bis = new BufferedInputStream(fis);
 			byte [] fileInByte = new byte [(int)file.length()];
-			System.out.println("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
+			if(INFO)
+				log.info("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
 			dos.writeInt(file.getName().getBytes().length);
 			dos.flush();
 			dos.write(file.getName().getBytes());
@@ -115,7 +130,8 @@ public class SenderConsumer implements Runnable{
 			dos.flush();
             bis.close();
             fis.close();
-            System.out.println("File "+file.getName()+" sent!!");
+            if(INFO)
+            	log.info("File "+file.getName()+" sent!!");
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 		} catch (IOException e) {

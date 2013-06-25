@@ -3,7 +3,7 @@
 bash ./log/clean.sh
 echo "clean done!"
 
-WPM_CLASS_PATH=.:wpm.jar:lib/*
+WPM_CLASS_PATH=.:wpm.jar:lib/*:config
 EXEC_MAIN=eu.cloudtm.wpm.main.Main
 MODULE=logService
 

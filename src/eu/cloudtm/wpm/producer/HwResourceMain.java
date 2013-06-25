@@ -28,11 +28,20 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
-/*
+import org.apache.log4j.Logger;
+
+import eu.cloudtm.wpm.consumer.AckConsumer;
+
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 
 public class HwResourceMain {
+	
+	private final static Logger log = Logger.getLogger(HwResourceMain.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	static String hostName;
 	static String Consumer_DP_IP_Address;
 	static int Consumer_DP_port_number;
@@ -45,9 +54,11 @@ public class HwResourceMain {
 		ResourcesController controller = new ResourcesController(Consumer_DP_IP_Address,Consumer_DP_port_number,Consumer_DP_IP_Address,Consumer_IP_local_port_number,Consumer_IP_remote_port_number,hostName);
 		// activate the controller
 		do{
-			System.out.println("Ciclo while pre activate");
+			if(INFO)
+				log.info("While cycle pre activate");
 			controller.activateControl();
-			System.out.println("Ciclo while post activate "+controller.isRunning());
+			if(INFO)
+				log.info("While cycle post activate "+controller.isRunning());
 		}while(!controller.isRunning());
 		
 		

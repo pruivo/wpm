@@ -31,17 +31,25 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import org.apache.log4j.Logger;
+
 import eu.cloudtm.resources.MonitorableResources;
+import eu.cloudtm.wpm.consumer.ResourceReporter;
 import eu.reservoir.monitoring.appl.DynamicControl;
 import eu.reservoir.monitoring.core.Probe;
 import eu.reservoir.monitoring.core.Rational;
 import eu.reservoir.monitoring.distribution.udp.UDPDataPlaneProducerNoNames;
 import eu.reservoir.monitoring.im.dht.DHTInfoPlane;
 
-/*
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class ResourcesController extends DynamicControl {
+
+	private final static Logger log = Logger.getLogger(ResourcesController.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	// the start time
     private long startTime = 0;
     private String cpuComponentID;
@@ -110,7 +118,8 @@ public class ResourcesController extends DynamicControl {
     protected void controlEvaluate() {
 		long now = System.currentTimeMillis();
 		long diff = (now - startTime) / 1000;
-		System.out.println(diff + ": " + this + " seen " + dataSource.getProbes().size());
+		if(INFO)
+			log.info(diff + ": " + this + " seen " + dataSource.getProbes().size());
 		
 		if(dataSource.getProbes().size() == 0){
 			dataSource.addProbe(cpuComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.CPU);

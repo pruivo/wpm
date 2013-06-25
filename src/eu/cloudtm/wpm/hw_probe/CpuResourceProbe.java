@@ -25,7 +25,10 @@ package eu.cloudtm.wpm.hw_probe;
 
 import java.util.ArrayList;
 
+import org.apache.log4j.Logger;
+
 import eu.cloudtm.resources.MonitorableResources;
+import eu.cloudtm.wpm.consumer.AckConsumer;
 import eu.reservoir.monitoring.core.AbstractProbe;
 import eu.reservoir.monitoring.core.DefaultProbeAttribute;
 import eu.reservoir.monitoring.core.DefaultProbeValue;
@@ -37,10 +40,15 @@ import eu.reservoir.monitoring.core.ProducerMeasurement;
 import eu.reservoir.monitoring.core.Rational;
 import eu.reservoir.monitoring.core.TypeException;
 
-/*
+/**
 * @author Roberto Palmieri
+* @author Sebastiano Peluso
 */
 public class CpuResourceProbe extends AbstractProbe implements Probe {
+	
+	private final static Logger log = Logger.getLogger(CpuResourceProbe.class);
+	private final static boolean INFO = log.isInfoEnabled();
+	
 	private CpuInfo monitored_cpu;
 	//probe_timeout in millisecond
 	public CpuResourceProbe(String name,int probe_timeout){
@@ -72,7 +80,8 @@ public class CpuResourceProbe extends AbstractProbe implements Probe {
 	}
 	
 	public ProbeMeasurement collect() {
-		System.out.println("Start collecting at: "+System.currentTimeMillis());
+		if(INFO)
+			log.info("Start collecting at: "+System.currentTimeMillis());
 		// list of proble values
 		ArrayList<ProbeValue> list = new ArrayList<ProbeValue>();
 		ArrayList<CpuValue> cpuValues = null;

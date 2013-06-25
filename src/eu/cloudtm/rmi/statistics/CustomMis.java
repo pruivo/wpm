@@ -55,7 +55,7 @@ public class CustomMis implements Serializable{
 	private void writeObject(ObjectOutputStream out) throws IOException{
 		out.defaultWriteObject();
 		out.writeObject(new Integer(valore));
-		System.out.println("pippo");
+		
 	}
 	private void readObject(ObjectInputStream aStream) throws IOException, ClassNotFoundException {
 		aStream.defaultReadObject();

@@ -37,6 +37,10 @@ import java.util.Set;
 */
 public class PublishMeasurement implements Externalizable{
 	
+	private static final String NULL_IP="NO_IP";
+	private static final String NULL_GROUP_ID="NO_GROUP_ID";
+	private static final String NULL_PROVIDER_ID="NO_PROVIDER_ID"; 
+	
 	String ip; 
 	String group_ID; 
 	String provider_ID;
@@ -46,6 +50,14 @@ public class PublishMeasurement implements Externalizable{
 	
 	
 	public PublishMeasurement(){
+		
+		loadNullFields();
+		values = new HashMap<String,PublishAttribute>();
+	}
+	
+    public PublishMeasurement(long timestamp){
+    	loadNullFields();
+		this.timestamp = timestamp;
 		
 		values = new HashMap<String,PublishAttribute>();
 	}
@@ -61,8 +73,8 @@ public class PublishMeasurement implements Externalizable{
 	}
 	
 	public void addMeasure(PublishAttribute measure){
-		
-		values.put(measure.getName(), measure);
+		if(measure != null)
+			values.put(measure.getName(), measure);
 		
 	}
 	
@@ -124,5 +136,10 @@ public class PublishMeasurement implements Externalizable{
 		
 	}
 	
+	public void loadNullFields(){
+		this.ip=PublishMeasurement.NULL_IP;
+		this.group_ID=PublishMeasurement.NULL_GROUP_ID;
+		this.provider_ID = PublishMeasurement.NULL_PROVIDER_ID;
+	}
 
 }
