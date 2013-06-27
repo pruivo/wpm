@@ -87,6 +87,7 @@ public class LogServiceAnalyzer implements Runnable{
 	
 	private final static Logger log = Logger.getLogger(LogServiceAnalyzer.class);
 	private final static boolean INFO = log.isInfoEnabled();
+	private final static boolean DEBUG = log.isDebugEnabled();
 	
 	private static int RMI_REGISTRY_PORT = 1099;
 	
@@ -978,9 +979,22 @@ public class LogServiceAnalyzer implements Runnable{
 		}
 		else if (aggrType == Aggregation.MEAN){
 			if(numSeenSamples > 0){
+				if(DEBUG){
+					log.debug("AGGREGATION");
+					log.debug("Name Result: "+result.getName());
+					log.debug("Name New Sample: "+newSample.getName());
+					log.debug("Old Result: "+partialDoubleValue);
+					log.debug("New Sample: "+newSampleDoubleValue);
+					log.debug("Num Seen Samples: "+numSeenSamples);
+					
+				}
+				result.setValue((partialDoubleValue * (numSeenSamples*1.0D) + newSampleDoubleValue) / ((numSeenSamples+1)*1.0D));
 				
-				result.setValue((partialDoubleValue / (numSeenSamples*1.0D) + newSampleDoubleValue) / ((numSeenSamples+1)*1.0D));
 				
+				if(DEBUG){
+					log.debug("Result: "+result.getValue());
+					log.debug(" ");
+				}
 			}
 		}
 		
