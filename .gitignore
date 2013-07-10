@@ -1,0 +1,15 @@
+# ignore bin folder
+bin/
+
+# ignore IDEA files
+*.iml
+*.ipr
+*.iws
+.idea
+atlassian-ide-plugin.xml
+maven-ant-tasks.jar
+test-output
+classes
+
+# ignore generated wpm.jar
+wpm.jar
