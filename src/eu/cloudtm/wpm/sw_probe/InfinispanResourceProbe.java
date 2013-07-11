@@ -23,6 +23,11 @@
  
 package eu.cloudtm.wpm.sw_probe;
 
+import eu.cloudtm.resources.MonitorableResources;
+import eu.reservoir.monitoring.core.*;
+import org.apache.log4j.Logger;
+
+import javax.management.*;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
@@ -32,28 +37,8 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 
-import javax.management.InstanceNotFoundException;
-import javax.management.IntrospectionException;
-import javax.management.MBeanAttributeInfo;
-import javax.management.MBeanException;
-import javax.management.MalformedObjectNameException;
-import javax.management.ObjectName;
-import javax.management.ReflectionException;
-
-import org.apache.log4j.Logger;
-
-import eu.cloudtm.resources.MonitorableResources;
-import eu.cloudtm.wpm.consumer.AckConsumer;
-import eu.reservoir.monitoring.core.AbstractProbe;
-import eu.reservoir.monitoring.core.DefaultProbeAttribute;
-import eu.reservoir.monitoring.core.DefaultProbeValue;
-import eu.reservoir.monitoring.core.Probe;
-import eu.reservoir.monitoring.core.ProbeAttributeType;
-import eu.reservoir.monitoring.core.ProbeMeasurement;
-import eu.reservoir.monitoring.core.ProbeValue;
-import eu.reservoir.monitoring.core.ProducerMeasurement;
-import eu.reservoir.monitoring.core.Rational;
-import eu.reservoir.monitoring.core.TypeException;
+import static eu.cloudtm.wpm.sw_probe.SoftwareProbeUtil.cleanCollection;
+import static eu.cloudtm.wpm.sw_probe.SoftwareProbeUtil.cleanValue;
 
 /**
 * @author Roberto Palmieri
@@ -198,11 +183,9 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 	        				int a = 0;
 	        			}
 	        			if(value instanceof Map){
-	    					Map map = (Map) value;
-	    					String value_str = MapToString(map);
-	    			    	list.add(new DefaultProbeValue(attributeKey++, cleanValue(value_str)));
+	    			    	list.add(new DefaultProbeValue(attributeKey++, cleanCollection(String.valueOf(value))));
 	    				}else if(value instanceof String){
-	    					list.add(new DefaultProbeValue(attributeKey++, cleanValue((String)value)));
+	    					list.add(new DefaultProbeValue(attributeKey++, cleanValue(String.valueOf(value))));
 	    				}else{
 	    					list.add(new DefaultProbeValue(attributeKey++, value));
 	    				}
@@ -241,20 +224,7 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 			e.printStackTrace();
 		}
 		return new ProducerMeasurement(this, list, MonitorableResources.JMX.toString());
-	}	
-	
-
-	private static String MapToString(Map map) {
-		String mapStringed = new String();
-		mapStringed = map.toString();
-		mapStringed = mapStringed.replace("{","");
-		mapStringed = mapStringed.replace("}","");
-		mapStringed = mapStringed.replace(" ","");
-		mapStringed = mapStringed.replace(",","|");
-		if(mapStringed.equals(""))
-			return "null";
-		return "|"+mapStringed;
-	}
+    }
 
 	private static void loadParametersFromRegistry(){
     	String propsFile = "config/infinispan_probe.config";
@@ -285,10 +255,4 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 		resetStatis = Boolean.parseBoolean(props.getProperty("ResetStats"));
 		
     }
-	private String cleanValue(String str){
-		String ris = str.replaceAll(",", "_");
-		ris = ris.replaceAll(" ", "__");
-		return ris;
-		
-	}
 }

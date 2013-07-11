@@ -28,6 +28,7 @@ import eu.cloudtm.wpm.hw_probe.CpuResourceProbe;
 import eu.cloudtm.wpm.hw_probe.DiskResourceProbe;
 import eu.cloudtm.wpm.hw_probe.MemoryResourceProbe;
 import eu.cloudtm.wpm.hw_probe.NetworkResourceProbe;
+import eu.cloudtm.wpm.sw_probe.FenixFrameworkResourceProbe;
 import eu.cloudtm.wpm.sw_probe.InfinispanResourceProbe;
 import eu.reservoir.monitoring.appl.BasicDataSource;
 import eu.reservoir.monitoring.core.DataSource;
@@ -56,6 +57,7 @@ public class ResourcesDataSource extends BasicDataSource implements DataSource {
 				case NETWORK : p = new NetworkResourceProbe(name, probe_timeout);break;
 				case DISK : p = new DiskResourceProbe(name, probe_timeout);break;
 				case JMX : p = new InfinispanResourceProbe(name, probe_timeout);break;
+				case FENIX: p = new FenixFrameworkResourceProbe(name, probe_timeout); break;
 				default : throw new RuntimeException("Unknown monitorable resource type");
 			}
 		    addProbe(p);

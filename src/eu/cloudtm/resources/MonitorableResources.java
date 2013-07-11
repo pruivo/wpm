@@ -30,5 +30,6 @@ public enum MonitorableResources {
 	MEMORY,
 	NETWORK,
 	DISK,
-	JMX
+	JMX,
+	FENIX
 }

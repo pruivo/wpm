@@ -127,6 +127,7 @@ public class ResourcesController extends DynamicControl {
 			dataSource.addProbe(netComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.NETWORK);
 			dataSource.addProbe(dskComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.DISK);
 			dataSource.addProbe(jmxComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.JMX);
+			dataSource.addProbe(jmxComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.FENIX);
 		}
     }
 
