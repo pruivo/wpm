@@ -46,12 +46,14 @@ public class PublishStatisticsEvent extends PublishEvent {
     private HashMap<String, Integer> numJmx;
     private HashMap<String, Integer> numNetwork;
     private HashMap<String, Integer> numDisk;
+    private HashMap<String, Integer> numFenix;
     
     private HashMap<String, PublishMeasurement> cpuValues;   
     private HashMap<String, PublishMeasurement> memoryValues;
     private HashMap<String, PublishMeasurement> jmxValues;
     private HashMap<String, PublishMeasurement> networkValues;
     private HashMap<String, PublishMeasurement> diskValues;
+    private HashMap<String, PublishMeasurement> fenixValues;
     
 	public PublishStatisticsEvent(){
 		super();
@@ -61,12 +63,14 @@ public class PublishStatisticsEvent extends PublishEvent {
 		jmxValues = new HashMap<String, PublishMeasurement>();
 		networkValues = new HashMap<String, PublishMeasurement>();
 		diskValues = new HashMap<String, PublishMeasurement>();
+        fenixValues = new HashMap<String, PublishMeasurement>();
 		
 		numCpu= new HashMap<String, Integer>();
 	    numMemory= new HashMap<String, Integer>();
 	    numJmx= new HashMap<String, Integer>();
 	    numNetwork= new HashMap<String, Integer>();
 	    numDisk= new HashMap<String, Integer>();
+        numFenix = new HashMap<String, Integer>();
 	}
 	
 	public PublishStatisticsEvent(String[] ips){
@@ -85,13 +89,14 @@ public class PublishStatisticsEvent extends PublishEvent {
 		jmxValues = new HashMap<String, PublishMeasurement>();
 		networkValues = new HashMap<String, PublishMeasurement>();
 		diskValues = new HashMap<String, PublishMeasurement>();
+        fenixValues = new HashMap<String, PublishMeasurement>();
 		
 		numCpu= new HashMap<String, Integer>();
 	    numMemory= new HashMap<String, Integer>();
 	    numJmx= new HashMap<String, Integer>();
 	    numNetwork= new HashMap<String, Integer>();
 	    numDisk= new HashMap<String, Integer>();
-		
+        numFenix = new HashMap<String, Integer>();
 	}
 	
 	
@@ -106,7 +111,7 @@ public class PublishStatisticsEvent extends PublishEvent {
 		
 		Integer VMIndex = this.ips.get(ip);
 		
-		if(VMIndex != null  && (resourceType.equals(ResourceType.DISK) || resourceType.equals(ResourceType.JMX) || resourceType.equals(ResourceType.MEMORY) || resourceType.equals(ResourceType.NETWORK) || resourceType.equals(ResourceType.CPU))){
+		if(VMIndex != null  && (resourceType.equals(ResourceType.DISK) || resourceType.equals(ResourceType.JMX) || resourceType.equals(ResourceType.MEMORY) || resourceType.equals(ResourceType.NETWORK) || resourceType.equals(ResourceType.CPU) || resourceType == ResourceType.FENIX)){
 			
 			
 				
@@ -142,7 +147,9 @@ public class PublishStatisticsEvent extends PublishEvent {
 						}
 						else if(resourceType.equals(ResourceType.NETWORK)){
 							pm = this.networkValues.get(key);
-						}
+						} else if (resourceType == ResourceType.FENIX) {
+                            pm = fenixValues.get(key);
+                        }
 						
 						if(pm == null){
 							pm = new PublishMeasurement(ip, group_ID, provider_ID, timestamp);
@@ -161,7 +168,9 @@ public class PublishStatisticsEvent extends PublishEvent {
 							}
 							else if(resourceType.equals(ResourceType.NETWORK)){
 								this.networkValues.put(key, pm);
-							}
+							} else if (resourceType == ResourceType.FENIX) {
+                                fenixValues.put(key, pm);
+                            }
 						}
 						
 						
@@ -185,7 +194,9 @@ public class PublishStatisticsEvent extends PublishEvent {
 					}
 					else if(resourceType.equals(ResourceType.NETWORK)){
 						this.numNetwork.put(key, resourcesIndexes.size());
-					}
+					} else if (resourceType == ResourceType.FENIX) {
+                        numFenix.put(key, resourcesIndexes.size());
+                    }
 					
 				}
 				
@@ -219,7 +230,9 @@ public class PublishStatisticsEvent extends PublishEvent {
 			}
 			else if(resourceType.equals(ResourceType.NETWORK)){
 				return this.networkValues.get(key);
-			}
+			} else if (resourceType == ResourceType.FENIX) {
+                return fenixValues.get(key);
+            }
 			else{
 				return null;
 			}
@@ -279,7 +292,13 @@ public class PublishStatisticsEvent extends PublishEvent {
 				}
 				
 				return value;
-			}
+			} else if (resourceType == ResourceType.FENIX) {
+                value = numFenix.get(key);
+                if (value == null) {
+                    return 0;
+                }
+                return value;
+            }
 			else{
 				return 0;
 			}

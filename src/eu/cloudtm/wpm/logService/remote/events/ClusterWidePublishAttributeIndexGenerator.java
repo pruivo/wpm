@@ -25,6 +25,8 @@ public class ClusterWidePublishAttributeIndexGenerator {
 	private int nextJMXId;
 	private HashMap<String, Integer> MEMORYstats;
 	private int nextMEMORYId;
+    private HashMap<String, Integer> FENIXstats;
+    private int nextFENIXId;
 	
 	private ClusterWidePublishAttributeIndexGenerator(){
 		
@@ -33,13 +35,14 @@ public class ClusterWidePublishAttributeIndexGenerator {
 		NETWORKstats = new HashMap<String, Integer>();
 		JMXstats = new HashMap<String, Integer>();
 		MEMORYstats = new HashMap<String, Integer>();
+        FENIXstats = new HashMap<String, Integer>();
 		
 		nextCPUId = 0;
 		nextDISKId = 0;
 		nextNETWORKId = 0;
 		nextJMXId = 0;
 		nextMEMORYId = 0;
-		
+		nextFENIXId = 0;
 		
 	}
 	
@@ -104,6 +107,14 @@ public class ClusterWidePublishAttributeIndexGenerator {
 			
 			return id;
 		}
+        else if (rt == ResourceType.FENIX) {
+            id = FENIXstats.get(attributeName);
+            if (id == null) {
+                id = nextFENIXId++;
+                FENIXstats.put(attributeName, id);
+            }
+            return id;
+        }
 		else{
 			return -1;
 		}

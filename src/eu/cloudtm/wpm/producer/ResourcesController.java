@@ -57,6 +57,7 @@ public class ResourcesController extends DynamicControl {
     private String dskComponentID;
     private String netComponentID;
     private String jmxComponentID;
+    private String ffComponentID;
     private String IP_Address;
     private String groupId;
     private String providerId;
@@ -127,7 +128,7 @@ public class ResourcesController extends DynamicControl {
 			dataSource.addProbe(netComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.NETWORK);
 			dataSource.addProbe(dskComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.DISK);
 			dataSource.addProbe(jmxComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.JMX);
-			dataSource.addProbe(jmxComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.FENIX);
+			dataSource.addProbe(ffComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.FENIX);
 		}
     }
 
@@ -167,6 +168,7 @@ public class ResourcesController extends DynamicControl {
 		netComponentID = props.getProperty("NET_Component_ID");
 		dskComponentID = props.getProperty("DSK_Component_ID");
 		jmxComponentID = props.getProperty("JMX_Component_ID");
+        ffComponentID = props.getProperty("FENIX_Component_ID");
 		IP_Address = props.getProperty("Producer_IP_Address");
 		if(IP_Address == null || IP_Address.equals("")){
 			try {

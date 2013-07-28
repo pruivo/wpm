@@ -31,5 +31,6 @@ public enum ResourceType {
 	MEMORY,
 	NETWORK,
 	DISK,
-	JMX
+	JMX,
+    FENIX,
 }
