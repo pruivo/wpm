@@ -355,77 +355,47 @@ public class LogServiceAnalyzer implements Runnable{
 				            				log.info("WPMPlatfom_NETWORKS:"+mis.getIp()+": "+cache.get("WPMPlatfom_NETWORKS:"+mis.getIp()));
 				            				log.info("WPMPlatfom_CACHES:"+mis.getIp()+": "+cache.get("WPMPlatfom_CACHES:"+mis.getIp()));
 				            			}
-
 				            		}
-
 				            	}
-				            	
-				            	
+
 				            	if(enableListeners){
-				            		
-				            		
-				            		//Try to publish here
-				            		
-				            		//First try to publish for the static subscription (it produces the cvs files!!!)
-				            		
+				            		// Try to publish here
+				            		// First try to publish for the static subscription (it produces the cvs files!!!)
+
 				            		PublishStatsEventInternal statsToPublish = null;
-				            		
+
 				            		if(this.csvFileStaticLocalSubscription != null){
-				            			
 				            			statsToPublish = this.csvFileStaticLocalSubscription.computePublishStatsEventInternal();
 				            		}
-				            		
-				            		
-				            			
-				            		//produce CSV here. This method returns the aggregated stats if any.
+
+				            		// produce CSV here. This method returns the aggregated stats if any.
 				            		AggregatedPublishAttributes aggregations = produceCSV(statsToPublish, System.currentTimeMillis());
-				            			
-				            			
-				            		
-				            		//Then try to publish for the dynamic subscriptions
-				            		
-				            		Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
-				            		
-				            		int i = 0;
-				            		int size = this.observable.numStatsSubscriptions();
-				            		
-			            			PublishStatsEventInternal[] toPublish= new PublishStatsEventInternal[size]; 
-			            			
-			            			while(itr.hasNext()){
-			            				
-			            				
-			            				toPublish[i] = itr.next().computePublishStatsEventInternal();
-			            				
-			            				if(toPublish[i]!=null){
-			            					
-			            					toPublish[i].addAggregations(aggregations);
-			            					
-			            				}
-			            				
-			            				i++;
-			            				
-			            			}
-			            			
-			            			
-			            			for(i=0; i < size; i++){
-			            				
-			            				if(toPublish[i] != null){
-			            					
-			            					PublisherStatsThread pt = new PublisherStatsThread(toPublish[i], this.observable);
-			            					
-			            					pt.start();
-			            				}
-			            				
-			            			}
-				            		
-				            		
-				            		
-				            	}
-				            	
-				            	
-				            	
+
+				            		// Then try to publish for the dynamic subscriptions
+
+                                    Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
+
+                                    int size = this.observable.numStatsSubscriptions();
+
+                                    List<PublishStatsEventInternal> toPublish = new ArrayList<PublishStatsEventInternal>(size);
+
+                                    while (itr.hasNext()) {
+                                        PublishStatsEventInternal publishStatsEventInternal = itr.next().computePublishStatsEventInternal();
+
+                                        if (publishStatsEventInternal != null) {
+                                            toPublish.add(publishStatsEventInternal);
+                                            publishStatsEventInternal.addAggregations(aggregations);
+                                        }
+
+                                    }
+
+                                    for (PublishStatsEventInternal publishStatsEventInternal : toPublish) {
+                                        PublisherStatsThread pt = new PublisherStatsThread(publishStatsEventInternal, this.observable);
+                                        pt.start();
+                                    }
+                                }
+
 				            	if(INFO){
-				            		
 				            		if(cache != null)
 				            			log.info("Dataitem in cache: "+cache.size());
 				            	}
