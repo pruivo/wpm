@@ -578,7 +578,7 @@ public class LogServiceAnalyzer implements Runnable{
 				PublishAttribute[] aggregatedDisk = produceAggregationFor(diskStats);
 				PublishAttribute[] aggregatedNetwork = produceAggregationFor(networkStats);
 				PublishAttribute[] aggregatedJmx = produceAggregationFor(jmxStats);
-                PublishAttribute[] aggregatedfenix = produceAggregationFor(fenixStats);
+                PublishAttribute[] aggregatedFenix = produceAggregationFor(fenixStats);
 				
 				AggregatedPublishAttributes agg = new AggregatedPublishAttributes(timestamp);
 				agg.add(ResourceType.CPU, aggregatedCPU);
@@ -586,11 +586,11 @@ public class LogServiceAnalyzer implements Runnable{
 				agg.add(ResourceType.DISK, aggregatedDisk);
 				agg.add(ResourceType.NETWORK, aggregatedNetwork);
 				agg.add(ResourceType.JMX, aggregatedJmx);
-                agg.add(ResourceType.FENIX, aggregatedfenix);
+                agg.add(ResourceType.FENIX, aggregatedFenix);
 				
 				
 				produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork,
-                        aggregatedJmx, aggregatedfenix, timestamp);
+                        aggregatedJmx, aggregatedFenix, timestamp);
 				
 				//produceAggregatedCSVFor(ResourceType.CPU, cpuStats);
 				//produceAggregatedCSVFor(ResourceType.MEMORY, memoryStats);
@@ -715,12 +715,8 @@ public class LogServiceAnalyzer implements Runnable{
 							if(current[i] != null){
 								header+=""+current[i].getName();
 								line+=""+current[i].getValue();
-								if(i!=current.length-1){
-									header+=",";
-									line+=",";
-								}	
-
-								
+                                header+=",";
+                                line+=",";
 							}	
 
 						}
