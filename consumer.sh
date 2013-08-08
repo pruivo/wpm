@@ -4,6 +4,7 @@ WORKING_DIR=`cd $(dirname $0); pwd`
 
 . ${WORKING_DIR}/environment.sh
 MODULE=consumer
+LOG_FILE="consumer.log"
 
 start_consumer() {
     clean
@@ -11,19 +12,14 @@ start_consumer() {
     append_d_var -Djavax.net.ssl.trustStorePassword=cloudtm
     append_d_var -Djavax.net.ssl.keyStore=config/serverkeys
     append_d_var -Djavax.net.ssl.keyStorePassword=cloudtm
-    start-wpm-module ${MODULE} consumer.log;
+    start-wpm-module ${MODULE} ${LOG_FILE};
 }
 case $1 in
     start)
-        pid ${MODULE};
-        if [ -z "${PID}" ]; then
-            start_consumer
-        else
-            echo "WPM module '${MODULE}' is already running. PID=${PID}"
-        fi
+        start_consumer
         ;;
     stop)
-        kill-wpm-module ${MODULE};
+        kill-wpm-module ${MODULE} $2;
         ;;
     status)
         pid ${MODULE};
@@ -36,11 +32,15 @@ case $1 in
     restart)
         kill-wpm-module ${MODULE};
         sleep 2s
+        clean_log_files ${LOG_FILE}
         start_consumer
+        ;;
+    clean)
+        clean_log_files ${LOG_FILE}
         ;;
     *)
         echo "Unknown command $1";
-        echo "usage $0 [start|stop|status|restart]"
+        echo "usage $0 [start|stop|status|restart|clean]"
         ;;
 esac
 

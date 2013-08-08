@@ -28,19 +28,28 @@ pid() {
 }
 
 kill-wpm-module() {
+    if [ -n "$2" ]; then
+        echo "Killing WPM module '$1' with PID=$2"
+        kill $2
+        return 0
+    fi
     pid $1;
     if [ -z "${PID}" ]; then
         echo "WPM module '$1' is not running";
     else
         echo "Killing WPM module '$1' with PID=${PID}";
-        kill ${PID};
+        for p_pid in ${PID}; do
+            kill ${p_pid};
+        done
     fi
 }
 
 start-wpm-module() {
-    echo "Starting WPM module '$1'";
-    echo "# Started at $(date)" > $2;
-    nohup java -cp ${CLASSPATH} ${D_VARS}  ${EXEC_MAIN} $1 >> $2 2>&1 &
-    pid $1
-    echo "Started WPM module '$1' with PID=${PID}. log file is $2"
+    echo "Starting WPM module '$1'...";
+    nohup java -cp ${CLASSPATH} ${D_VARS} ${EXEC_MAIN} $1 > $$.$2 2>&1 &
+    echo "Started WPM module '$1'"
+}
+
+clean_log_files() {
+    rm -r *.$1;
 }

@@ -4,21 +4,18 @@ WORKING_DIR=`cd $(dirname $0); pwd`
 
 . ${WORKING_DIR}/environment.sh
 MODULE=producer
+LOG_FILE="producer.log"
 
 start_producer() {
-    start-wpm-module ${MODULE} producer.log;
+    start-wpm-module ${MODULE} ${LOG_FILE};
 }
 case $1 in
     start)
         pid ${MODULE};
-        if [ -z "${PID}" ]; then
-            start_producer
-        else
-            echo "WPM module '${MODULE}' is already running. PID=${PID}"
-        fi
+        start_producer
         ;;
     stop)
-        kill-wpm-module ${MODULE};
+        kill-wpm-module ${MODULE} $2;
         ;;
     status)
         pid ${MODULE};
@@ -31,7 +28,11 @@ case $1 in
     restart)
         kill-wpm-module ${MODULE};
         sleep 2s
+        clean_log_files ${LOG_FILE}
         start_producer
+        ;;
+    clean)
+        clean_log_files ${LOG_FILE}
         ;;
     *)
         echo "Unknown command $1";
