@@ -55,6 +55,7 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
     private String jmxDomain;
     private boolean reset;
     private MBeanServerConnection mBeanServerConnection;
+    private volatile boolean errorResetingStats = false;
 
     //probe_timeout in millisecond
     public FenixFrameworkResourceProbe(String name, int probeTimeout) {
@@ -100,22 +101,45 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
     }
 
     private void collectForMBean(MBeanInfo mBeanInfo, List<ProbeValue> valueList) {
+        Set<String> attributeListToCollect = mBeanInfo.copyToSet();
         try {
             AttributeList attributesValues = mBeanServerConnection.getAttributes(mBeanInfo.objectName,
                     mBeanInfo.attributes());
             for (Attribute att : attributesValues.asList()) {
-                Object value = att.getValue();
-
-                if (value instanceof Map || value instanceof Collection) {
-                    valueList.add(mBeanInfo.toProbeValue(att.getName(), cleanCollection(valueOf(value))));
-                } else if (value instanceof String) {
-                    valueList.add(mBeanInfo.toProbeValue(att.getName(), cleanValue(valueOf(value))));
-                } else {
-                    valueList.add(mBeanInfo.toProbeValue(att.getName(), value));
+                if (safeAdd(valueList, mBeanInfo, att.getName(), att.getValue())) {
+                    attributeListToCollect.remove(att.getName());
                 }
             }
         } catch (Exception e) {
             log.error("Error collecting statistic for " + mBeanInfo.objectName, e);
+        }
+        for (String missingAttribute : attributeListToCollect) {
+            safeAddDefault(valueList, mBeanInfo, missingAttribute);
+        }
+    }
+
+    private boolean safeAdd(List<ProbeValue> valueList, MBeanInfo mBeanInfo, String attribute, Object value) {
+        try {
+            if (value instanceof Map || value instanceof Collection) {
+                valueList.add(mBeanInfo.toProbeValue(attribute, cleanCollection(valueOf(value))));
+            } else if (value instanceof String) {
+                valueList.add(mBeanInfo.toProbeValue(attribute, cleanValue(valueOf(value))));
+            } else {
+                valueList.add(mBeanInfo.toProbeValue(attribute, value));
+            }
+            return true;
+        } catch (TypeException e) {
+            log.error("Type Exception for " + mBeanInfo.objectName + " and attribute " + attribute, e);
+        }
+        return false;
+    }
+
+    private void safeAddDefault(List<ProbeValue> valueList, MBeanInfo mBeanInfo, String attribute) {
+        try {
+            valueList.add(mBeanInfo.toDefaultProbeValue(attribute));
+        } catch (TypeException e) {
+            //this should never happen
+            log.fatal("Type Exception in default for " + mBeanInfo.objectName + " and attribute " + attribute, e);
         }
     }
 
@@ -125,7 +149,14 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
             try {
                 mBeanServerConnection.invoke(objectName, "reset", new Object[]{}, new String[]{});
             } catch (Exception e) {
-                log.error("Error resetting statistic for " + objectName, e);
+                if (!errorResetingStats) {
+                    log.error("Error resetting statistic for " + objectName, e);
+                    errorResetingStats = true; //log the error only once
+                } else if (log.isDebugEnabled()) {
+                    //in debug, notify always!
+                    log.debug("Error resetting statistic for " + objectName, e);
+                }
+
             }
         } else {
             if (INFO) {
@@ -213,18 +244,19 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
         }
     }
 
-    private void registerProbes(Collection<ObjectName> mbeans) throws Exception {
+    private void registerProbes(Collection<ObjectName> mBeans) throws Exception {
         if (INFO) {
             log.info("Registering Fenix Framework MBeans...");
         }
         int attributeKey = 0;
         int offset = 0;
-        for (ObjectName objectName : mbeans) {
+        for (ObjectName objectName : mBeans) {
             if (INFO) {
                 log.info("Registering " + objectName);
             }
             String remoteApplication = objectName.getKeyProperty("remoteApplication");
             final boolean isThreadPool = remoteApplication == null;
+            final boolean isDap = objectName.getKeyProperty("component").equals("DapRemoteManager");
             MBeanInfo mBeanInfo = new MBeanInfo(objectName, offset);
             MBeanAttributeInfo[] beanAttributeInfos = mBeanServerConnection.getMBeanInfo(objectName).getAttributes();
             for (MBeanAttributeInfo info : beanAttributeInfos) {
@@ -234,14 +266,21 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
                     continue;
                 }
 
-                final String displayName = isThreadPool ? String.format("%s.%s", applicationName, info.getName()) :
-                        String.format("%s.messaging(%s).%s", applicationName, remoteApplication, info.getName());
+                String displayName;
+                if (isDap) {
+                    displayName = String.format("DAP.%s", info.getName());
+                } else if (isThreadPool) {
+                    displayName = String.format("%s.%s", applicationName, info.getName());
+                } else {
+                    displayName = String.format("%s.messaging(%s).%s", applicationName, remoteApplication, info.getName());
+                }
 
-                mBeanInfo.addAttribute(info.getName());
+
                 if (INFO) {
                     log.info("Registering " + info.getName() + ". Display name=" + displayName);
                 }
 
+                Object defaultValue = 0;
                 if (info.getType().equals("double")) {
                     addProbeAttribute(new DefaultProbeAttribute(attributeKey++, displayName, ProbeAttributeType.DOUBLE, ""));
                 } else if (info.getType().equals("long")) {
@@ -254,9 +293,9 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
                     addProbeAttribute(new DefaultProbeAttribute(attributeKey++, displayName, ProbeAttributeType.SHORT, ""));
                 } else {
                     addProbeAttribute(new DefaultProbeAttribute(attributeKey++, displayName, ProbeAttributeType.STRING, ""));
-                    if (INFO)
-                        log.info(info.getType());
+                    defaultValue = "N/A";
                 }
+                mBeanInfo.addAttribute(info.getName(), defaultValue);
             }
             offset += mBeanInfo.size();
             mBeanInfoList.add(mBeanInfo);
@@ -267,15 +306,18 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
         private final ObjectName objectName;
         private final int offset;
         private final List<String> attributeList;
+        private final List<Object> defaultValueList;
 
         private MBeanInfo(ObjectName objectName, int offset) {
             this.objectName = objectName;
             this.offset = offset;
             this.attributeList = new ArrayList<String>();
+            defaultValueList = new ArrayList<Object>();
         }
 
-        public final void addAttribute(String jmxName) {
+        public final void addAttribute(String jmxName, Object defaultValue) {
             attributeList.add(jmxName);
+            defaultValueList.add(defaultValue);
         }
 
         public final int size() {
@@ -288,12 +330,24 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
             return attributeList.toArray(result);
         }
 
+        public final Set<String> copyToSet() {
+            return new HashSet<String>(attributeList);
+        }
+
         public final ProbeValue toProbeValue(String jmxName, Object value) throws TypeException {
             int index = attributeList.indexOf(jmxName);
             if (index == -1) {
                 return null;
             }
             return new DefaultProbeValue(index + offset, value);
+        }
+
+        public final ProbeValue toDefaultProbeValue(String jmxName) throws TypeException {
+            int index = attributeList.indexOf(jmxName);
+            if (index == -1) {
+                return null;
+            }
+            return new DefaultProbeValue(index + offset, defaultValueList.get(index));
         }
     }
 }

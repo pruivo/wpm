@@ -24,6 +24,9 @@ public class SoftwareProbeUtil {
     }
 
     public static String cleanValue(String str) {
+        if (str == null || str.isEmpty()) {
+            return "null";
+        }
         String ris = str.replaceAll(",", "_");
         ris = ris.replaceAll(" ", "__");
         return ris;
