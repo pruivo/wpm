@@ -20,7 +20,7 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
- 
+
 package eu.cloudtm.wpm.producer;
 
 
@@ -49,7 +49,7 @@ public class ResourcesController extends DynamicControl {
 
 	private final static Logger log = Logger.getLogger(ResourcesController.class);
 	private final static boolean INFO = log.isInfoEnabled();
-	
+
 	// the start time
     private long startTime = 0;
     private String cpuComponentID;
@@ -71,7 +71,7 @@ public class ResourcesController extends DynamicControl {
 		//set up counter
 		//set up data source
 		InetSocketAddress address = new InetSocketAddress(consumer_DP_addr, consumer_DP_port);
-		
+
 		// set up multicast addresses
 		//MulticastAddress dataGroup = new MulticastAddress(addr, port);
 		//dataSource.setDataPlane(new MulticastDataPlaneProducer(dataGroup));
@@ -84,7 +84,7 @@ public class ResourcesController extends DynamicControl {
 		//dataSource.setDataPlane(new UDPDataPlaneProducer(address));
 		//Without names
 		dataSource.setDataPlane(new UDPDataPlaneProducerNoNames(address));
-		
+
 		dataSource.setInfoPlane(new DHTInfoPlane(consumer_IP_addr, consumer_IP_remote_port, consumer_IP_local_port));
 		int num_try = 0;
 		do{
@@ -101,7 +101,7 @@ public class ResourcesController extends DynamicControl {
 				num_try++;
 			}
 		}while(!isConnected);
-		
+
     }
 
     /**
@@ -121,14 +121,16 @@ public class ResourcesController extends DynamicControl {
 		long diff = (now - startTime) / 1000;
 		if(INFO)
 			log.info(diff + ": " + this + " seen " + dataSource.getProbes().size());
-		
+
 		if(dataSource.getProbes().size() == 0){
 			dataSource.addProbe(cpuComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.CPU);
 			dataSource.addProbe(memComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.MEMORY);
 			dataSource.addProbe(netComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.NETWORK);
 			dataSource.addProbe(dskComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.DISK);
 			dataSource.addProbe(jmxComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.JMX);
-			dataSource.addProbe(ffComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.FENIX);
+            if (ffComponentID != null) {
+                dataSource.addProbe(ffComponentID+":"+IP_Address+":"+groupId+":"+providerId,collection_timeout,MonitorableResources.FENIX);
+            }
 		}
     }
 
@@ -139,7 +141,7 @@ public class ResourcesController extends DynamicControl {
     	System.out.println("Clean Control");
     	//this.activateControl();
     }
-    
+
     public void setProbeDataRate(String name, int probe_timeout) {
     	Probe probe = dataSource.getProbeByName(name);
     	if(probe == null)
@@ -153,7 +155,7 @@ public class ResourcesController extends DynamicControl {
 		}
 		probe.setDataRate(probe_rate);
     }
-    
+
     private void loadParametersFromRegistry(){
     	String propsFile = "config/resource_controller.config";
     	Properties props = new Properties();
@@ -162,7 +164,7 @@ public class ResourcesController extends DynamicControl {
 		} catch (IOException e1) {
 			e1.printStackTrace();
 		}
-		
+
 		cpuComponentID = props.getProperty("CPU_Component_ID");
 		memComponentID = props.getProperty("MEM_Component_ID");
 		netComponentID = props.getProperty("NET_Component_ID");
@@ -182,5 +184,5 @@ public class ResourcesController extends DynamicControl {
 		providerId = props.getProperty("Producer_Provider");
 		collection_timeout = Integer.parseInt(props.getProperty("Collect_Timeout"));
     }
-    
+
 }
