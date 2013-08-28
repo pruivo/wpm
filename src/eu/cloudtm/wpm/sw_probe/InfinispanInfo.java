@@ -23,12 +23,11 @@
  
 package eu.cloudtm.wpm.sw_probe;
 
+import java.net.MalformedURLException;
 import java.util.Set;
 
 import javax.management.MBeanServerConnection;
 import javax.management.ObjectName;
-import javax.management.remote.JMXConnector;
-import javax.management.remote.JMXConnectorFactory;
 import javax.management.remote.JMXServiceURL;
 
 /**
@@ -182,14 +181,16 @@ public class InfinispanInfo {
     */
 	
     private void connectToJMXServer(){
-    	JMXServiceURL url = null;
-    	JMXConnector jmxc = null;
+    	JMXServiceURL url;
+    	try {
+			url = JmxConnectionManager.jmxRmiUrl(address, port);
+    	} catch (MalformedURLException e) {
+			throw new RuntimeException(e);
+    	}
     	boolean isConnected = false;
     	while(!isConnected){
 	    	try {
-				url = new JMXServiceURL("service:jmx:rmi:///jndi/rmi://"+address+":"+port+"/jmxrmi");
-				jmxc = JMXConnectorFactory.connect(url, null);
-				mbsc = jmxc.getMBeanServerConnection();
+				mbsc = JmxConnectionManager.getInstance().getConnection(url);
 				ObjectName obj_mbeans;
 				obj_mbeans = new ObjectName(jmxDomain_primary+":type=Cache,*");
 				Set<ObjectName> mbeans = mbsc.queryNames(obj_mbeans, null);
@@ -227,15 +228,16 @@ public class InfinispanInfo {
     }
     
     private void connectToJBossJMXServer(){
-    	JMXServiceURL url = null;
-    	JMXConnector jmxc = null;
+		JMXServiceURL url;
+		try {
+			url = JmxConnectionManager.jbossRemotingUrl(address, port);
+		} catch (MalformedURLException e) {
+			throw new RuntimeException(e);
+		}
     	boolean isConnected = false;
     	while(!isConnected){
     		try {
-        		String urlString = System.getProperty("jmx.service.url","service:jmx:remoting-jmx://" + address + ":" + port);
-                url = new JMXServiceURL(urlString);
-                jmxc = JMXConnectorFactory.connect(url, null);
-                mbsc = jmxc.getMBeanServerConnection();
+                mbsc = JmxConnectionManager.getInstance().getConnection(url);
                 ObjectName obj_mbeans;
 				obj_mbeans = new ObjectName(jmxDomain_primary+":type=Cache,*");
 				Set<ObjectName> mbeans = mbsc.queryNames(obj_mbeans, null);

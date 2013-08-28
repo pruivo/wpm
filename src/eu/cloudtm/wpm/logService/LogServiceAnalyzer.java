@@ -355,77 +355,47 @@ public class LogServiceAnalyzer implements Runnable{
 				            				log.info("WPMPlatfom_NETWORKS:"+mis.getIp()+": "+cache.get("WPMPlatfom_NETWORKS:"+mis.getIp()));
 				            				log.info("WPMPlatfom_CACHES:"+mis.getIp()+": "+cache.get("WPMPlatfom_CACHES:"+mis.getIp()));
 				            			}
-
 				            		}
-
 				            	}
-				            	
-				            	
+
 				            	if(enableListeners){
-				            		
-				            		
-				            		//Try to publish here
-				            		
-				            		//First try to publish for the static subscription (it produces the cvs files!!!)
-				            		
+				            		// Try to publish here
+				            		// First try to publish for the static subscription (it produces the cvs files!!!)
+
 				            		PublishStatsEventInternal statsToPublish = null;
-				            		
+
 				            		if(this.csvFileStaticLocalSubscription != null){
-				            			
 				            			statsToPublish = this.csvFileStaticLocalSubscription.computePublishStatsEventInternal();
 				            		}
-				            		
-				            		
-				            			
-				            		//produce CSV here. This method returns the aggregated stats if any.
+
+				            		// produce CSV here. This method returns the aggregated stats if any.
 				            		AggregatedPublishAttributes aggregations = produceCSV(statsToPublish, System.currentTimeMillis());
-				            			
-				            			
-				            		
-				            		//Then try to publish for the dynamic subscriptions
-				            		
-				            		Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
-				            		
-				            		int i = 0;
-				            		int size = this.observable.numStatsSubscriptions();
-				            		
-			            			PublishStatsEventInternal[] toPublish= new PublishStatsEventInternal[size]; 
-			            			
-			            			while(itr.hasNext()){
-			            				
-			            				
-			            				toPublish[i] = itr.next().computePublishStatsEventInternal();
-			            				
-			            				if(toPublish[i]!=null){
-			            					
-			            					toPublish[i].addAggregations(aggregations);
-			            					
-			            				}
-			            				
-			            				i++;
-			            				
-			            			}
-			            			
-			            			
-			            			for(i=0; i < size; i++){
-			            				
-			            				if(toPublish[i] != null){
-			            					
-			            					PublisherStatsThread pt = new PublisherStatsThread(toPublish[i], this.observable);
-			            					
-			            					pt.start();
-			            				}
-			            				
-			            			}
-				            		
-				            		
-				            		
-				            	}
-				            	
-				            	
-				            	
+
+				            		// Then try to publish for the dynamic subscriptions
+
+                                    Iterator<StatsSubscriptionEntry> itr = this.observable.getStatsIterator();
+
+                                    int size = this.observable.numStatsSubscriptions();
+
+                                    List<PublishStatsEventInternal> toPublish = new ArrayList<PublishStatsEventInternal>(size);
+
+                                    while (itr.hasNext()) {
+                                        PublishStatsEventInternal publishStatsEventInternal = itr.next().computePublishStatsEventInternal();
+
+                                        if (publishStatsEventInternal != null) {
+                                            toPublish.add(publishStatsEventInternal);
+                                            publishStatsEventInternal.addAggregations(aggregations);
+                                        }
+
+                                    }
+
+                                    for (PublishStatsEventInternal publishStatsEventInternal : toPublish) {
+                                        PublisherStatsThread pt = new PublisherStatsThread(publishStatsEventInternal, this.observable);
+                                        pt.start();
+                                    }
+                                }
+
 				            	if(INFO){
-				            		
 				            		if(cache != null)
 				            			log.info("Dataitem in cache: "+cache.size());
 				            	}
@@ -456,6 +426,7 @@ public class LogServiceAnalyzer implements Runnable{
 			List<PublishAttribute[]> networkStats = new LinkedList<PublishAttribute[]>();
 			List<PublishAttribute[]> diskStats = new LinkedList<PublishAttribute[]>();
 			List<PublishAttribute[]> jmxStats = new LinkedList<PublishAttribute[]>();
+            List<PublishAttribute[]> fenixStats = new LinkedList<PublishAttribute[]>();
 
 
 			if(pse != null){
@@ -563,10 +534,13 @@ public class LogServiceAnalyzer implements Runnable{
 						}
 					}
 
-					
-					
+                    //FENIX
+                    currentResourceType = ResourceType.FENIX;
+                    allAttr = produceCSVFor(pse, currentIP, currentResourceType, timestamp);
 
-
+                    if(allAttr != null){
+                        Collections.addAll(fenixStats, allAttr);
+                    }
 				}
 				
 				PublishAttribute[] aggregatedCPU = produceAggregationFor(cpuStats);
@@ -574,6 +548,7 @@ public class LogServiceAnalyzer implements Runnable{
 				PublishAttribute[] aggregatedDisk = produceAggregationFor(diskStats);
 				PublishAttribute[] aggregatedNetwork = produceAggregationFor(networkStats);
 				PublishAttribute[] aggregatedJmx = produceAggregationFor(jmxStats);
+                PublishAttribute[] aggregatedFenix = produceAggregationFor(fenixStats);
 				
 				AggregatedPublishAttributes agg = new AggregatedPublishAttributes(timestamp);
 				agg.add(ResourceType.CPU, aggregatedCPU);
@@ -581,9 +556,11 @@ public class LogServiceAnalyzer implements Runnable{
 				agg.add(ResourceType.DISK, aggregatedDisk);
 				agg.add(ResourceType.NETWORK, aggregatedNetwork);
 				agg.add(ResourceType.JMX, aggregatedJmx);
+                agg.add(ResourceType.FENIX, aggregatedFenix);
 				
 				
-				produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork, aggregatedJmx, timestamp);
+				produceAggregatedCSVFor(aggregatedCPU, aggregatedMemory, aggregatedDisk, aggregatedNetwork,
+                        aggregatedJmx, aggregatedFenix, timestamp);
 				
 				//produceAggregatedCSVFor(ResourceType.CPU, cpuStats);
 				//produceAggregatedCSVFor(ResourceType.MEMORY, memoryStats);
@@ -600,7 +577,9 @@ public class LogServiceAnalyzer implements Runnable{
 	}
 	
 	
-	private void produceAggregatedCSVFor(PublishAttribute[] aggregatedCPU, PublishAttribute[] aggregatedMemory, PublishAttribute[] aggregatedDisk, PublishAttribute[] aggregatedNetwork, PublishAttribute[] aggregatedJmx, long timestamp){
+	private void produceAggregatedCSVFor(PublishAttribute[] aggregatedCPU, PublishAttribute[] aggregatedMemory,
+                                         PublishAttribute[] aggregatedDisk, PublishAttribute[] aggregatedNetwork,
+                                         PublishAttribute[] aggregatedJmx, PublishAttribute[] aggregatedfenix, long timestamp){
 		
 			PublishAttribute[] current;
 			
@@ -706,20 +685,28 @@ public class LogServiceAnalyzer implements Runnable{
 							if(current[i] != null){
 								header+=""+current[i].getName();
 								line+=""+current[i].getValue();
-								if(i!=current.length-1){
-									header+=",";
-									line+=",";
-								}	
-
-								
+                                header+=",";
+                                line+=",";
 							}	
 
 						}
 
 					}
-					
-					
-					
+
+                    current = aggregatedfenix;
+                    if(current != null){
+                        for(int i = 0; i<current.length; i++){
+                            if(current[i] != null){
+                                header+=""+current[i].getName();
+                                line+=""+current[i].getValue();
+                                if(i!=current.length-1){
+                                    header+=",";
+                                    line+=",";
+                                }
+                            }
+                        }
+                    }
+
 					if(!exists){
 						out.println(header);
 					}

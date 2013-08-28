@@ -14,6 +14,7 @@ public class PublishAggregatedStatisticsEvent extends PublishEvent {
     PublishMeasurement jmxValues;
     PublishMeasurement networkValues;
     PublishMeasurement diskValues;
+    PublishMeasurement fenixValues;
     
     
     public PublishAggregatedStatisticsEvent(){
@@ -41,7 +42,9 @@ public class PublishAggregatedStatisticsEvent extends PublishEvent {
     		}
     		else if(ResourceType.DISK.equals(rt)){
     			diskValues = pm;
-    		}
+    		} else if (rt == ResourceType.FENIX) {
+                fenixValues = pm;
+            }
 
     		for(int i=0; i < attributes.length; i++){
     				
@@ -70,7 +73,9 @@ public class PublishAggregatedStatisticsEvent extends PublishEvent {
 		}
 		else if(ResourceType.DISK.equals(rt)){
 			return diskValues;
-		}
+		} else if (rt == ResourceType.FENIX) {
+            return fenixValues;
+        }
     	
     	
     	return null;
@@ -85,6 +90,7 @@ public class PublishAggregatedStatisticsEvent extends PublishEvent {
 		jmxValues = (PublishMeasurement) in.readObject();
 		networkValues = (PublishMeasurement) in.readObject();
 		diskValues = (PublishMeasurement) in.readObject();
+        fenixValues = (PublishMeasurement) in.readObject();
 
 	}
 
@@ -95,7 +101,7 @@ public class PublishAggregatedStatisticsEvent extends PublishEvent {
 		out.writeObject(jmxValues);
 		out.writeObject(networkValues);
 		out.writeObject(diskValues);
-		
+		out.writeObject(fenixValues);
 
 	}
 
