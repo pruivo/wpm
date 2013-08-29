@@ -24,17 +24,13 @@
 package eu.cloudtm.wpm.logService;
 
 import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.rmi.RemoteException;
@@ -42,12 +38,10 @@ import java.util.Properties;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
 
-import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
-
-import eu.cloudtm.wpm.consumer.AckConsumer;
 
 /**
 * @author Roberto Palmieri
@@ -57,7 +51,8 @@ public class LogService {
 	
 	private final static Logger log = Logger.getLogger(LogService.class);
 	private final static boolean INFO = log.isInfoEnabled();
-	
+	public static final String PROPERTY_FILE = "config/log_service.config";
+
 	static int port_num;
 	static final int filesize = 2048;
 
@@ -78,17 +73,20 @@ public class LogService {
 			while (true) {
 				if(INFO)
 					log.info("Log Service Waiting...");
-				Socket sock = servsock.accept();
-				InputStream is = sock.getInputStream();
-				DataInputStream dis = new DataInputStream(is);
-				//receive Zip file
-				File zipFile = receiveFile(dis);
-				//receive Check file
-				File checkFile = receiveFile(dis);
-				checkZipFile(checkFile,zipFile);
-				dis.close();
-				is.close();
-				sock.close();
+				Socket sock = null;
+				DataInputStream dis = null;
+                try {
+                    sock = servsock.accept();
+                    dis = new DataInputStream(sock.getInputStream());
+                    //receive Zip file
+                    File zipFile = receiveFile(dis);
+                    //receive Check file
+                    File checkFile = receiveFile(dis);
+                    checkZipFile(checkFile,zipFile);
+                } finally {
+                    Utils.safeClose(dis);
+                    Utils.safeClose(sock);
+                }
 				if(INFO)
 					log.info("Now I can process...");
 			}
@@ -99,33 +97,26 @@ public class LogService {
 	}
 	
 	private static void loadParametersFromRegistry(){
-    	String propsFile = "config/log_service.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+    	Properties props = Utils.loadProperties(PROPERTY_FILE);
 		port_num = Integer.parseInt(props.getProperty("Port_number"));
     }
 	public static ServerSocket getServer() throws Exception {
 		SSLServerSocketFactory sslserversocketfactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
-		SSLServerSocket serversocket = (SSLServerSocket) sslserversocketfactory.createServerSocket(port_num);
-		return serversocket;
+        return sslserversocketfactory.createServerSocket(port_num);
 	}
 	
 	private static void checkZipFile(File checkFile, File zipFile){
 		if(INFO)
 			log.info("checking files...");
-		try{
-			FileInputStream f_check_stream = new FileInputStream(checkFile);
-		    DataInputStream check_in = new DataInputStream(f_check_stream);
-		    BufferedReader br = new BufferedReader(new InputStreamReader(check_in));
-		    FileInputStream f_zip_stream = new FileInputStream(zipFile);
-		    CheckedInputStream check = new CheckedInputStream(f_zip_stream, new Adler32());
-		    BufferedInputStream in_zip = new BufferedInputStream(check);
+        BufferedReader br = null;
+        CheckedInputStream check = null;
+        BufferedInputStream in_zip = null;
+        try{
+		    br = new BufferedReader(new InputStreamReader(new FileInputStream(checkFile)));
+		    check = new CheckedInputStream(new FileInputStream(zipFile), new Adler32());
+		    in_zip = new BufferedInputStream(check);
 		    while (in_zip.read() != -1);
-		    String strLine = "";
+		    String strLine;
 		    if((strLine = br.readLine()) != null){
 		    	try{
 		    		long fileCheck_cks = Long.parseLong(strLine);
@@ -144,58 +135,28 @@ public class LogService {
 		    }
 		}catch(Exception ex){
 			ex.printStackTrace();
-		}
-	}
+		} finally {
+            Utils.safeCloseAll(br, check, in_zip);
+        }
+    }
 	
 	private static File receiveFile(DataInputStream dis){
 		try{
-			byte [] fileInByte = new byte [filesize];
-		    int count = 0;
-		    int sizeOfName = dis.readInt();
-		    count = dis.read(fileInByte, 0, sizeOfName);
-		    String filename = new String(fileInByte,0,count);
-		    File nameFileToStore = new File("log/ls_unprocessed/"+filename);
-		    FileOutputStream fos = new FileOutputStream(nameFileToStore);
-			BufferedOutputStream dest = new BufferedOutputStream(fos, filesize);
-		    int sizeOfFile = dis.readInt();
-		    int totalSize = 0;
-		    while((count = dis.read(fileInByte, 0, filesize)) != -1) {
-				dest.write(fileInByte, 0, count);
-				totalSize+=count;
-				if(totalSize == sizeOfFile)
-					break;
-			}
-		    dest.flush();
-		    dest.close();
-		    fos.close();
-		    if(INFO)
-		    	log.info("File "+filename+" written!!");
-			return nameFileToStore;
+			return Utils.receiveFile(dis);
 		}catch(Exception e){
 			e.printStackTrace();
 		}
-		return null;
+        return null;
 	}
 	
 	private static void copyfile(File f1, File f2){
 		try{
-			InputStream in = new FileInputStream(f1);
-			//For Overwrite the file.
-			OutputStream out = new FileOutputStream(f2);
-			byte[] buf = new byte[1024];
-			int len;
-			while ((len = in.read(buf)) > 0){
-				out.write(buf, 0, len);
-			}
-			in.close();
-			out.close();
-			if(INFO)
-				log.info("File copied.");
+			Utils.copyFile(f1, f2);
 		}catch(FileNotFoundException ex){
 			System.out.println(ex.getMessage() + " in the specified directory.");
 			System.exit(0);
-		}catch(IOException e){
-			System.out.println(e.getMessage());
-		}
-	}
+		} catch (IOException e) {
+            //no-op
+        }
+    }
 }

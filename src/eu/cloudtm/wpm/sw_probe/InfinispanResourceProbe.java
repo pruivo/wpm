@@ -24,11 +24,11 @@
 package eu.cloudtm.wpm.sw_probe;
 
 import eu.cloudtm.resources.MonitorableResources;
+import eu.cloudtm.wpm.Utils;
 import eu.reservoir.monitoring.core.*;
 import org.apache.log4j.Logger;
 
 import javax.management.*;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -47,6 +47,7 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
 	private final static boolean INFO = log.isInfoEnabled();
     private static final String TRANSACTION_CLASS_SUFFIX = "ForTxClass";
 	private static final String[] TRANSACTION_CLASS_SIGNATURE = new String[] {"java.lang.String"};
+    private static final String PROPERTY_FILE = "config/infinispan_probe.config";
 
 	static InfinispanInfo monitored_infinispan;
 	static String addr;
@@ -343,13 +344,7 @@ public class InfinispanResourceProbe extends AbstractProbe implements Probe {
     }
 
 	private void loadParametersFromRegistry(){
-    	String propsFile = "config/infinispan_probe.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+    	Properties props = Utils.loadProperties(PROPERTY_FILE);
 		port_num = Integer.parseInt(props.getProperty("Infinispan_JMX_port_number"));
 		cache_name = props.getProperty("Cache_name");
 		jmxDomain_primary = props.getProperty("JMXDomain_primary");

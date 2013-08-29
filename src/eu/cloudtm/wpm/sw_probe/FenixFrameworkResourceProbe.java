@@ -24,6 +24,7 @@
 package eu.cloudtm.wpm.sw_probe;
 
 import eu.cloudtm.resources.MonitorableResources;
+import eu.cloudtm.wpm.Utils;
 import eu.reservoir.monitoring.core.*;
 import org.apache.log4j.Logger;
 
@@ -166,14 +167,7 @@ public class FenixFrameworkResourceProbe extends AbstractProbe implements Probe 
     }
 
     private boolean loadPropertiesAndConnect() {
-        Properties props = new Properties();
-        try {
-            props.load(new FileInputStream(PROPERTY_FILE));
-        } catch (Exception e) {
-            log.error("Error loading properties from " + PROPERTY_FILE, e);
-            return false;
-        }
-
+        Properties props = Utils.loadProperties(PROPERTY_FILE);
         applicationName = props.getProperty("fenix.appName");
         jmxDomain = props.getProperty("jmx.domain");
         int port = Integer.parseInt(props.getProperty("jmx.port"));

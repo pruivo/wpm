@@ -28,15 +28,13 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.net.Socket;
 import java.net.UnknownHostException;
 
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
-
-import eu.cloudtm.wpm.producer.ResourcesController;
 
 /**
 * @author Roberto Palmieri
@@ -67,6 +65,8 @@ public class SenderConsumer implements Runnable{
 				Thread.sleep(timeout);
 			} catch (InterruptedException e) {
 				e.printStackTrace();
+                Thread.currentThread().interrupt();
+                return;
 			}
 			try {
 				if(INFO)
@@ -76,6 +76,8 @@ public class SenderConsumer implements Runnable{
 					for(File activeFile : active_folder.listFiles()){
 						if(!activeFile.getName().endsWith(".ready"))
 							continue;
+                        DataOutputStream dos = null;
+                        Socket sock = null;
 						try{
 							//now check if exist .zip and .check files
 							File zipFile = new File("log/active/"+activeFile.getName().substring(0,activeFile.getName().indexOf(".ready"))+".zip");
@@ -85,14 +87,10 @@ public class SenderConsumer implements Runnable{
 							if(zipFile != null && zipFile.isFile() && checkFile != null && checkFile.isFile()){
 								//send zip and check file to log Service
 								SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-								SSLSocket sock = (SSLSocket) factory.createSocket(logService_addr, logService_port);
-								OutputStream os = sock.getOutputStream();
-								DataOutputStream dos = new DataOutputStream (os);
+								sock = factory.createSocket(logService_addr, logService_port);
+								dos = new DataOutputStream(sock.getOutputStream());
 								sendFile(zipFile,dos);
-								sendFile(checkFile,dos);
-								dos.close();
-					            os.close();
-					            sock.close();
+								sendFile(checkFile, dos);
 					            //delete ready file for make the comunication simple
 					            
 					            if(!activeFile.delete()){
@@ -103,39 +101,22 @@ public class SenderConsumer implements Runnable{
 					        }
 						}catch(Exception e){
 							e.printStackTrace();
-						}
-					}
+						} finally {
+                            Utils.safeClose(dos);
+                            Utils.safeClose(sock);
+                        }
+                    }
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
 			}
 		}
 	}
-	private void sendFile(File file,DataOutputStream dos){
+	private void sendFile(File file, DataOutputStream dos){
 		try {
-			FileInputStream fis = new FileInputStream(file);
-			BufferedInputStream bis = new BufferedInputStream(fis);
-			byte [] fileInByte = new byte [(int)file.length()];
-			if(INFO)
-				log.info("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
-			dos.writeInt(file.getName().getBytes().length);
-			dos.flush();
-			dos.write(file.getName().getBytes());
-			dos.flush();
-			//System.out.println("FileName written");
-			dos.writeInt((int)file.length());
-			dos.flush();
-			bis.read(fileInByte, 0, fileInByte.length);
-			dos.write(fileInByte);
-			dos.flush();
-            bis.close();
-            fis.close();
-            if(INFO)
-            	log.info("File "+file.getName()+" sent!!");
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			Utils.sendFile(file, dos);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
+    }
 }
