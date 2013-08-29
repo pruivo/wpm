@@ -31,6 +31,7 @@ import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
 
 import eu.cloudtm.resources.MonitorableResources;
@@ -49,6 +50,7 @@ public class ResourcesController extends DynamicControl {
 
 	private final static Logger log = Logger.getLogger(ResourcesController.class);
 	private final static boolean INFO = log.isInfoEnabled();
+    public static final String PROPERTY_FILE = "config/resource_controller.config";
 
 	// the start time
     private long startTime = 0;
@@ -157,15 +159,8 @@ public class ResourcesController extends DynamicControl {
     }
 
     private void loadParametersFromRegistry(){
-    	String propsFile = "config/resource_controller.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-
-		cpuComponentID = props.getProperty("CPU_Component_ID");
+        Properties props = Utils.loadProperties(PROPERTY_FILE);
+        cpuComponentID = props.getProperty("CPU_Component_ID");
 		memComponentID = props.getProperty("MEM_Component_ID");
 		netComponentID = props.getProperty("NET_Component_ID");
 		dskComponentID = props.getProperty("DSK_Component_ID");

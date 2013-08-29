@@ -28,6 +28,7 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.Properties;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
 
 import eu.cloudtm.wpm.consumer.AckConsumer;
@@ -64,13 +65,7 @@ public class HwResourceMain {
 		
 	}
 	private static void loadParametersFromRegistry(){
-    	String propsFile = "config/resource_controller.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+    	Properties props = Utils.loadProperties(ResourcesController.PROPERTY_FILE);
 		hostName = props.getProperty("hostName");
 		Consumer_DP_IP_Address = props.getProperty("Consumer_DP_IP_Address");
 		Consumer_DP_port_number = Integer.parseInt(props.getProperty("Consumer_DP_port_number"));

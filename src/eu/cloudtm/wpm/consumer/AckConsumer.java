@@ -20,7 +20,7 @@
  * Software Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org.
  */
- 
+
 package eu.cloudtm.wpm.consumer;
 
 import java.io.BufferedOutputStream;
@@ -29,14 +29,12 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-import javax.net.ssl.SSLServerSocket;
 import javax.net.ssl.SSLServerSocketFactory;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
 
 /*
@@ -44,13 +42,13 @@ import org.apache.log4j.Logger;
 * @author Sebastiano Peluso
 */
 public class AckConsumer implements Runnable{
-	
+
 	private final static Logger log = Logger.getLogger(AckConsumer.class);
 	private final static boolean INFO = log.isInfoEnabled();
-	
+
 	private int port_num;
 	private static final int filesize = 1024;
-	
+
 	public AckConsumer(int consumerAckPort){
 		port_num = consumerAckPort;
 		Thread consumer_ack = new Thread(this,"Consumer Ack Thread");
@@ -59,24 +57,25 @@ public class AckConsumer implements Runnable{
 
 	@Override
 	public void run() {
-		ServerSocket servsock = null;
+		ServerSocket servsock;
 		try {
 			servsock = getServer();
 		} catch (Exception e1) {
 			e1.printStackTrace();
+            return;
 		}
-		DataOutputStream dos = null;
 		while(true){
+            DataOutputStream dos = null;
+            DataInputStream dis = null;
+            Socket sock = null;
 			try {
 				if(INFO)
 					log.info("Consumer Ack Thread Waiting on port..."+port_num);
-				Socket sock = servsock.accept();
+				sock = servsock.accept();
 				if(INFO)
 					log.info("Consumer Ack Thread accepted connection...");
-				OutputStream os = sock.getOutputStream();
-				InputStream is = sock.getInputStream();
-				dos = new DataOutputStream (os);
-				DataInputStream dis = new DataInputStream(is);
+				dos = new DataOutputStream (sock.getOutputStream());
+				dis = new DataInputStream(sock.getInputStream());
 				//receive ack file
 				File ackFile = receiveFile(dis);
 				if(INFO)
@@ -94,16 +93,16 @@ public class AckConsumer implements Runnable{
 				if(zipFile.isFile()){
 					zipFile.delete();
 				}
-				sendMsg("ACK",dos);
-				dis.close();
-				is.close();
-				sock.close();
-				
+				sendMsg("ACK", dos);
+
 			} catch (IOException e) {
 				e.printStackTrace();
 				sendMsg("NACK",dos);
-			}
-		}
+			} finally {
+                Utils.safeCloseAll(dis, dos);
+                Utils.safeClose(sock);
+            }
+        }
 	}
 	private void sendMsg(String strMsg, DataOutputStream dos){
 		try{
@@ -115,40 +114,18 @@ public class AckConsumer implements Runnable{
 			e.printStackTrace();
 		}
 	}
-	
-	private static File receiveFile(DataInputStream dis){
-		try{
-			byte [] fileInByte = new byte [filesize];
-		    int count = 0;
-		    int sizeOfName = dis.readInt();
-		    count = dis.read(fileInByte, 0, sizeOfName);
-		    String filename = new String(fileInByte,0,count);
-		    File nameFileToStore = new File("log/ack/"+filename);
-		    FileOutputStream fos = new FileOutputStream(nameFileToStore);
-			BufferedOutputStream dest = new BufferedOutputStream(fos, filesize);
-		    int sizeOfFile = dis.readInt();
-		    int totalSize = 0;
-		    while((totalSize != sizeOfFile) && ((count = dis.read(fileInByte, 0, filesize)) != -1)) {
-				dest.write(fileInByte, 0, count);
-				totalSize+=count;
-				if(totalSize == sizeOfFile)
-					break;
-			}
-		    dest.flush();
-		    dest.close();
-		    fos.close();
-		    if(INFO)
-		    	log.info("File "+filename+" written!!");
-			return nameFileToStore;
-		}catch(Exception e){
-			e.printStackTrace();
-		}
-		return null;
-	}
-	
+
+    private static File receiveFile(DataInputStream dis){
+        try{
+            return Utils.receiveFile(dis);
+        }catch(Exception e){
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 	public ServerSocket getServer() throws Exception {
 		SSLServerSocketFactory sslserversocketfactory = (SSLServerSocketFactory) SSLServerSocketFactory.getDefault();
-		SSLServerSocket serversocket = (SSLServerSocket) sslserversocketfactory.createServerSocket(port_num);
-		return serversocket;
+        return sslserversocketfactory.createServerSocket(port_num);
 	}
 }

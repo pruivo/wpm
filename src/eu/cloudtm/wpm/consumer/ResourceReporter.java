@@ -23,18 +23,13 @@
  
 package eu.cloudtm.wpm.consumer;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileWriter;
+import java.io.*;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedOutputStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
 
 import eu.cloudtm.wpm.hw_probe.NetworkResourceProbe;
@@ -71,53 +66,30 @@ public class ResourceReporter implements Reporter {
 		long currentTimestamp = System.currentTimeMillis();
 		File logFile = new File("log/stat_"+id_consumer+".log");
 		try{
-			FileWriter fstream = new FileWriter(logFile,true);
-			BufferedWriter out = new BufferedWriter(fstream);
-			//out.write("Name:"+probeName+"Value:"+m.toString()+"\n");
-			if(m instanceof ConsumerMeasurementWithMetadataAndProbeName){
-				ConsumerMeasurementWithMetadataAndProbeName cm = (ConsumerMeasurementWithMetadataAndProbeName) m;
-				//out.write(m.toString()+"\n");
-				out.write(formatMeasurement(cm));
-			}else if(m instanceof ConsumerMeasurementWithMetaData){
-				ConsumerMeasurementWithMetaData cm = (ConsumerMeasurementWithMetaData) m;
-				//out.write(ng()+"\n");
-				
-				out.write(formatMeasurementWithName(cm,infoModel));
-			}else{
-				throw new RuntimeException("Unsupported measurement message");
-			}
-			if(INFO)
-				log.info("File updated!!");
-			out.close();
+			appendMeasurement(m, logFile);
 			if(currentTimestamp - lastTimestamp >= timeToRefresh){
 				if(INFO)
 					log.info("Generating zip file...");
 				byte [] logFileByteArray  = new byte [(int)logFile.length()];
-				FileInputStream fis = new FileInputStream(logFile);
-				fis = new FileInputStream(logFile);
-				BufferedInputStream bis = new BufferedInputStream(fis);
+				BufferedInputStream bis = new BufferedInputStream(new FileInputStream(logFile));
 				//Create zip file to store
 				File logFileZip = new File("log/active/"+(logFile.getName().substring(0,logFile.getName().lastIndexOf(".log")))+"_"+lastTimestamp+"_"+currentTimestamp+".log.zip");
-				FileOutputStream dest = new FileOutputStream(logFileZip);
-				CheckedOutputStream checksum = new CheckedOutputStream(dest, new Adler32());
-				ZipOutputStream outZip = new ZipOutputStream(new BufferedOutputStream(checksum));
+				CheckedOutputStream checksum = new CheckedOutputStream(new FileOutputStream(logFileZip), new Adler32());
+				ZipOutputStream outZip = new ZipOutputStream(checksum);
 				ZipEntry entry = new ZipEntry(logFileZip.getName().substring(0,logFileZip.getName().lastIndexOf(".zip")));
 				outZip.putNextEntry(entry);
 	            bis.read(logFileByteArray, 0, logFileByteArray.length);
-	            outZip.write(logFileByteArray,0,logFileByteArray.length);
-	            outZip.close();
-	            bis.close();
-	            fis.close();
+	            outZip.write(logFileByteArray, 0, logFileByteArray.length);
+                outZip.closeEntry();
+	            Utils.safeCloseAll(bis, outZip);
 	            if(INFO){
 	            	log.info("done!");
 	            	log.info("Zip file stored: "+logFile.getPath());
 	            }
 	            File checkFile = new File("log/active/"+logFileZip.getName().substring(0,logFileZip.getName().lastIndexOf(".zip"))+".check");
-	            FileWriter fw = new FileWriter(checkFile);
-	            BufferedWriter checkFile_writer = new BufferedWriter(fw);
-	            checkFile_writer.write(new String(""+checksum.getChecksum().getValue()));
-	            checkFile_writer.close();
-	            fw.close();
+	            BufferedWriter checkFile_writer = new BufferedWriter(new FileWriter(checkFile));
+	            checkFile_writer.write(Long.toString(checksum.getChecksum().getValue()));
+	            Utils.safeClose(checkFile_writer);
 	            if(INFO)
 	            	log.info("Check file stored: "+checkFile.getPath());
 	            File readyFile = new File("log/active/"+logFileZip.getName().substring(0,logFileZip.getName().lastIndexOf(".zip"))+".ready");
@@ -156,4 +128,29 @@ public class ResourceReporter implements Reporter {
 		
 		return ""+m.getSequenceNo()+":"+m.getProbeID()+":"+probeName+":"+m.getTimestamp()+":"+m.getType()+values+"\n";
 	}
+
+    private void appendMeasurement(Measurement measurement, File file) throws IOException {
+        BufferedWriter out = null;
+        try {
+            out = new BufferedWriter(new FileWriter(file, true));
+
+            //out.write("Name:"+probeName+"Value:"+m.toString()+"\n");
+            if (measurement instanceof ConsumerMeasurementWithMetadataAndProbeName) {
+                ConsumerMeasurementWithMetadataAndProbeName cm = (ConsumerMeasurementWithMetadataAndProbeName) measurement;
+                //out.write(m.toString()+"\n");
+                out.write(formatMeasurement(cm));
+            } else if (measurement instanceof ConsumerMeasurementWithMetaData) {
+                ConsumerMeasurementWithMetaData cm = (ConsumerMeasurementWithMetaData) measurement;
+                //out.write(ng()+"\n");
+                out.write(formatMeasurementWithName(cm, infoModel));
+            } else {
+                throw new RuntimeException("Unsupported measurement message");
+            }
+            if (INFO)
+                log.info("File updated!!");
+        } finally {
+            Utils.safeClose(out);
+        }
+
+    }
 }

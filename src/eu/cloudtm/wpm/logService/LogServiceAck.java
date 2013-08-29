@@ -29,17 +29,14 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.net.Socket;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
-import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
-
-import eu.cloudtm.wpm.consumer.AckConsumer;
 
 /*
 * @author Roberto Palmieri
@@ -74,22 +71,23 @@ public class LogServiceAck implements Runnable{
 					for(File activeFile : active_folder.listFiles()){
 						if(!activeFile.getName().endsWith(".ack"))
 							continue;
+                        Socket sock = null;
+                        DataOutputStream dos = null;
+                        DataInputStream dis = null;
 						try {
 							//take the ip on the filename sent by consumer
 							//activeFile contains the IP to send the ack file
 							//stat_127.0.0.1_0_1338842406981.log
-							String IP_consumer = new String("");
+							String IP_consumer = "";
 							if(activeFile.getName().startsWith("stat_")){
 								String filename_no_stat = activeFile.getName().substring(5);
 								IP_consumer = filename_no_stat.substring(0, filename_no_stat.indexOf("_"));
 							}
 							//String IP_consumer = activeFile.
 							SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-							SSLSocket sock = (SSLSocket) factory.createSocket(IP_consumer, consumer_port);
-							OutputStream os = sock.getOutputStream();
-							InputStream is = sock.getInputStream();
-							DataOutputStream dos = new DataOutputStream (os);
-							DataInputStream dis = new DataInputStream(is);
+							sock = factory.createSocket(IP_consumer, consumer_port);
+                            dos = new DataOutputStream(sock.getOutputStream());
+							dis = new DataInputStream(sock.getInputStream());
 							
 							sendFile(activeFile,dos);
 							if(INFO)
@@ -103,14 +101,13 @@ public class LogServiceAck implements Runnable{
 								if(INFO)
 									log.info("NACK received");
 							}	
-							dos.close();
-							dis.close();
-				            os.close();
-				            sock.close();
 						} catch (IOException e) {
 							e.printStackTrace();
-						}
-					}
+						} finally {
+                            Utils.safeCloseAll(dis, dos);
+                            Utils.safeClose(sock);
+                        }
+                    }
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -119,45 +116,18 @@ public class LogServiceAck implements Runnable{
 	}
 	
 	private void loadParametersFromRegistry(){
-    	String propsFile = "config/log_service.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+    	Properties props = Utils.loadProperties(LogService.PROPERTY_FILE);
 		consumer_port = Integer.parseInt(props.getProperty("Consumer_ack_port_number"));
 		timeout = Long.parseLong(props.getProperty("AckThreadTimeout"));
     }
 	
 	private void sendFile(File file,DataOutputStream dos){
 		try {
-			FileInputStream fis = new FileInputStream(file);
-			BufferedInputStream bis = new BufferedInputStream(fis);
-			byte [] fileInByte = new byte [(int)file.length()];
-			if(INFO)
-				log.info("FileName sending..."+file.getName()+" bytes "+file.getName().getBytes().length);
-			dos.writeInt(file.getName().getBytes().length);
-			dos.flush();
-			dos.write(file.getName().getBytes());
-			dos.flush();
-			if(INFO)
-				log.info("FileName written");
-			dos.writeInt((int)file.length());
-			dos.flush();
-			bis.read(fileInByte, 0, fileInByte.length);
-			dos.write(fileInByte);
-			dos.flush();
-            bis.close();
-            fis.close();
-            if(INFO)
-            	log.info("File "+file.getName()+" sent!!");
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
+			Utils.sendFile(file, dos);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-	}
+    }
 	
 	private static String receiveAck(DataInputStream dis){
 		try{
@@ -165,8 +135,7 @@ public class LogServiceAck implements Runnable{
 		    int count = 0;
 		    int sizeOfMsg = dis.readInt();
 		    count = dis.read(msgInByte, 0, sizeOfMsg);
-		    String msg = new String(msgInByte,0,count);
-			return msg;
+            return new String(msgInByte,0,count);
 		}catch(Exception e){
 			e.printStackTrace();
 		}

@@ -23,10 +23,7 @@
  
 package eu.cloudtm.wpm.logService;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -41,7 +38,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -49,17 +45,12 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.PriorityQueue;
 import java.util.Properties;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
-import javax.rmi.ssl.SslRMIClientSocketFactory;
-import javax.rmi.ssl.SslRMIServerSocketFactory;
-
+import eu.cloudtm.wpm.Utils;
 import org.apache.log4j.Logger;
 import org.infinispan.Cache;
 import org.infinispan.config.Configuration;
@@ -67,12 +58,9 @@ import org.infinispan.config.GlobalConfiguration;
 import org.infinispan.manager.DefaultCacheManager;
 import org.infinispan.manager.EmbeddedCacheManager;
 
-import eu.cloudtm.wpm.consumer.AckConsumer;
 import eu.cloudtm.wpm.logService.remote.observables.*;
 
 import eu.cloudtm.wpm.logService.remote.events.*;
-
-import eu.cloudtm.wpm.logService.remote.listeners.*;
 
 import eu.cloudtm.wpm.logService.remote.publisher.*;
 
@@ -88,6 +76,7 @@ public class LogServiceAnalyzer implements Runnable{
 	private final static Logger log = Logger.getLogger(LogServiceAnalyzer.class);
 	private final static boolean INFO = log.isInfoEnabled();
 	private final static boolean DEBUG = log.isDebugEnabled();
+    private static final String PROPERTY_FILE = "config/stats_aggregation.config";
 	
 	private static int RMI_REGISTRY_PORT = 1099;
 	
@@ -172,27 +161,30 @@ public class LogServiceAnalyzer implements Runnable{
 					for(File activeFile : active_folder.listFiles()){
 						if(!activeFile.getName().endsWith(".zip"))
 							continue;
+                        ZipInputStream zis = null;
+                        BufferedReader br = null;
 						try {
-					        FileInputStream is = new FileInputStream(activeFile);
-						    ZipInputStream zis = new ZipInputStream(new BufferedInputStream(is));
-						    ZipEntry entry = null;
-						    FileOutputStream fos = null;
+						    zis = new ZipInputStream(new FileInputStream(activeFile));
+						    ZipEntry entry;
 						    String nameFileToStore = "";
 						    if((entry = zis.getNextEntry()) != null){
 						    	byte [] logFileByteArray  = new byte [filesize];
 						    	int count = 0;
 						    	nameFileToStore = "log/ls_worked/"+entry.getName();
-						    	fos = new FileOutputStream(nameFileToStore);
-						    	BufferedOutputStream dest = new BufferedOutputStream(fos, filesize);
-						    	if(INFO)
-						    		log.info("Extracting: " +entry.getName());
-								while ((count = zis.read(logFileByteArray, 0, filesize)) != -1) {
-									dest.write(logFileByteArray, 0, count);
-								}
-								dest.flush();
-						    }
-						    fos.close();
-						    zis.close();
+                                FileOutputStream fos = null;
+                                try {
+                                    fos = new FileOutputStream(nameFileToStore);
+                                    if(INFO)
+                                        log.info("Extracting: " +entry.getName());
+                                    while ((count = zis.read(logFileByteArray, 0, filesize)) != -1) {
+                                        fos.write(logFileByteArray, 0, count);
+                                    }
+                                    fos.flush();
+                                } finally {
+                                    Utils.safeClose(fos);
+                                    zis.closeEntry();
+                                }
+                            }
 						    if(INFO)
 						    	log.info("File decompressed stored");
 						    //Create ack file
@@ -209,11 +201,8 @@ public class LogServiceAnalyzer implements Runnable{
 				            if(enableInfinispan || enableListeners){
 				            	//timestamp nomeMetrica:valore;nomeMetrica:valore;nomeMetrica:valore
 				            	String strLine = "";
-				            	FileInputStream fstream = new FileInputStream(nameFileToStore);
-				            	DataInputStream in = new DataInputStream(fstream);
-				            	BufferedReader br = new BufferedReader(new InputStreamReader(in));
-				            	
-				            	
+				            	br = new BufferedReader(new InputStreamReader(new FileInputStream(nameFileToStore)));
+
 				            	boolean membersChanged = false;
 				            	
 				            	while ((strLine = br.readLine()) != null){
@@ -407,8 +396,10 @@ public class LogServiceAnalyzer implements Runnable{
 				            }
 						} catch (IOException e) {
 							e.printStackTrace();
-						}
-					}
+						} finally {
+                            Utils.safeCloseAll(zis, br);
+                        }
+                    }
 				}
 			} catch (Exception e) {
 				e.printStackTrace();
@@ -1076,12 +1067,8 @@ public class LogServiceAnalyzer implements Runnable{
     		}
 
 
-    		FileOutputStream fosNumeric = null;
     		PrintStream outNumeric = null;
-    		FileOutputStream fosOthers = null;
     		PrintStream outOthers = null;
-    		
-    		FileOutputStream fosTopKeys = null;
     		PrintStream outTopKeys = null;
     		try {
     			boolean existsNumeric = false;
@@ -1114,13 +1101,10 @@ public class LogServiceAnalyzer implements Runnable{
     				existsTopKeys = fileTopKeys.exists();
     			}
 
-    			fosNumeric = new FileOutputStream(fileNumeric, true);
-    			outNumeric = new PrintStream(fosNumeric);
-    			fosOthers = new FileOutputStream(fileOthers, true);
-    			outOthers = new PrintStream(fosOthers);
+    			outNumeric = new PrintStream(new FileOutputStream(fileNumeric, true));
+    			outOthers = new PrintStream(new FileOutputStream(fileOthers, true));
     			if(resType.equals(ResourceType.JMX)){
-    				fosTopKeys = new FileOutputStream(fileTopKeys, true);
-    				outTopKeys = new PrintStream(fosTopKeys);
+    				outTopKeys = new PrintStream(new FileOutputStream(fileTopKeys, true));
     			}
     			
     			String lineNumeric;
@@ -1147,7 +1131,7 @@ public class LogServiceAnalyzer implements Runnable{
     								headerNumeric+=""+allAttr[i][j].getName()+"_"+i;
     								if(allAttr[i][j].isBoolean()){
     									if(allAttr[i][j].getValue() != null){
-    										if(((Boolean)allAttr[i][j].getValue()) == true){
+    										if(((Boolean) allAttr[i][j].getValue())){
     											lineNumeric+=""+"1";
     										}
     										else{
@@ -1227,17 +1211,7 @@ public class LogServiceAnalyzer implements Runnable{
     			e.printStackTrace();
     		}
     		finally{
-    			if(outNumeric != null){
-    				outNumeric.close();
-    			}
-
-    			if(fosNumeric != null){
-    				try {
-    					fosNumeric.close();
-    				} catch (IOException e) {
-    					e.printStackTrace();
-    				}
-    			}
+                Utils.safeCloseAll(outNumeric, outOthers, outTopKeys);
     		}
     	}
 
@@ -1803,13 +1777,7 @@ public class LogServiceAnalyzer implements Runnable{
 	}
 
 	private void loadParametersFromRegistry(){
-    	String propsFile = "config/log_service.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
+    	Properties props = Utils.loadProperties(LogService.PROPERTY_FILE);
 		cacheName = props.getProperty("Cache_name");
 		//infinispanConfigFile = props.getProperty("InfinispanConfigFile");
 		timeout = Long.parseLong(props.getProperty("AnalyzerThreadTimeout"));
@@ -1830,36 +1798,27 @@ public class LogServiceAnalyzer implements Runnable{
 	}
 	
 	private void loadAggregationTypesFromRegistry(){
-    	String propsFile = "config/stats_aggregation.config";
-    	Properties props = new Properties();
-		try {
-			props.load(new FileInputStream(propsFile));
-			
-			this.aggregationTypes = new HashMap<String, Aggregation>();
-			
-			Set<String> keys = props.stringPropertyNames();
-			String value;
-			for(String k: keys){
-				
-				value = props.getProperty(k);
-				
-				if("MEAN".equalsIgnoreCase(value)){
-					this.aggregationTypes.put(k.toLowerCase(), Aggregation.MEAN);
-				}
-				else if("SUM".equalsIgnoreCase(value)){
-					this.aggregationTypes.put(k.toLowerCase(), Aggregation.SUM);
-				}
-				else if("NONE".equalsIgnoreCase(value)){
-					this.aggregationTypes.put(k.toLowerCase(), Aggregation.NO);
-				}
-				
-			}
-			
-			
-		} catch (IOException e1) {
-			e1.printStackTrace();
-		}
-		
+    	Properties props = Utils.loadProperties(PROPERTY_FILE);
+
+        this.aggregationTypes = new HashMap<String, Aggregation>();
+
+        Set<String> keys = props.stringPropertyNames();
+        String value;
+        for(String k: keys){
+
+            value = props.getProperty(k);
+
+            if("MEAN".equalsIgnoreCase(value)){
+                this.aggregationTypes.put(k.toLowerCase(), Aggregation.MEAN);
+            }
+            else if("SUM".equalsIgnoreCase(value)){
+                this.aggregationTypes.put(k.toLowerCase(), Aggregation.SUM);
+            }
+            else if("NONE".equalsIgnoreCase(value)){
+                this.aggregationTypes.put(k.toLowerCase(), Aggregation.NO);
+            }
+
+        }
     }
 		
 		
